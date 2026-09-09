@@ -57,6 +57,14 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perHour(3)->by($request->ip());
         });
 
+        RateLimiter::for('mcp', function (Request $request) {
+            return Limit::perMinute(30)->by($request->user()?->id ?: $request->ip());
+        });
+
+        Passport::authorizationView(function (array $parameters) {
+            return response()->view('mcp.authorize', $parameters);
+        });
+
         try {
             $settingService = app(SettingService::class);
             $settings = $settingService->allSettings();
