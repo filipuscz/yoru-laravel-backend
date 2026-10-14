@@ -7,6 +7,33 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
+## Yoru Laravel Backend
+
+This repository is a Laravel API template. The default database is **PostgreSQL** (`DB_CONNECTION=pgsql`), served by container `global_postgres` in `../docker-stack`.
+
+```bash
+cd ../docker-stack
+docker compose --profile postgres up -d
+```
+
+Then copy `.env.example` to `.env` and migrate. Connection defaults:
+
+| Setting | Value |
+| --- | --- |
+| Host | `global_postgres` |
+| Port | `5432` |
+| Database | `yorupus_be_template` |
+| Username | `root` |
+| Password | `123` |
+
+`global_php84` needs the `pdo_pgsql` extension. Run migrations from that container when the host PHP build does not have it:
+
+```bash
+docker exec -w /var/www/yoru-laravel-backend global_php84 php artisan migrate --no-interaction --force
+```
+
+Request and endpoint details are in [DEVELOPER.md](DEVELOPER.md). Agent and schema rules are in [AGENTS.md](AGENTS.md).
+
 ## About Laravel
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:

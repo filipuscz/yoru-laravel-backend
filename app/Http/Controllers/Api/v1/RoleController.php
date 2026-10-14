@@ -54,9 +54,9 @@ class RoleController extends BaseApiController
         ]);
     }
 
-    public function show(string $idOrSlug): JsonResponse
+    public function show(string $role): JsonResponse
     {
-        $data = $this->roleService->findById($idOrSlug);
+        $data = $this->roleService->findById($role);
         throw_if((empty($data)), new NotFoundHttpException(__('messages.data_not_found')));
 
         return $this->setStatusMsg('success')->respondOK([
@@ -64,9 +64,9 @@ class RoleController extends BaseApiController
         ]);
     }
 
-    public function update(StoreUpdateRequest $request, string $idOrSlug): JsonResponse
+    public function update(StoreUpdateRequest $request, string $role): JsonResponse
     {
-        $data = $this->roleService->update($request->all(), $idOrSlug);
+        $data = $this->roleService->update($request->all(), $role);
 
         return $this->respondOK([
             'data' => new RoleResource($data),
@@ -88,12 +88,12 @@ class RoleController extends BaseApiController
         return $this->respondOK(null, __('messages.resources_updated', ['count' => $count]), true);
     }
 
-    public function destroy(string $idOrSlug): JsonResponse
+    public function destroy(string $role): JsonResponse
     {
-        $data = $this->roleService->findById($idOrSlug);
+        $data = $this->roleService->findById($role);
         throw_if(! $data, new NotFoundHttpException(__('messages.data_not_found')));
 
-        $this->roleService->delete($idOrSlug);
+        $this->roleService->delete($role);
 
         return $this->respondOK(null, __('messages.deleted'), true);
     }

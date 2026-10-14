@@ -6,7 +6,6 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 
 class UserService extends BaseService
 {
@@ -18,10 +17,6 @@ class UserService extends BaseService
     public function create(array $data): Model
     {
         return DB::transaction(function () use ($data) {
-            if (isset($data['password'])) {
-                $data['password'] = Hash::make($data['password']);
-            }
-
             /** @var User $user */
             $user = parent::create($data);
 
@@ -39,9 +34,7 @@ class UserService extends BaseService
     public function update(array $data, mixed $idOrSlug): ?Model
     {
         return DB::transaction(function () use ($data, $idOrSlug) {
-            if (! empty($data['password'])) {
-                $data['password'] = Hash::make($data['password']);
-            } else {
+            if (empty($data['password'])) {
                 unset($data['password']);
             }
 

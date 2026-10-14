@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Pagination\CursorPaginator;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Response;
 
 class BaseApiController extends Controller
@@ -259,7 +260,8 @@ class BaseApiController extends Controller
         $any = $indexes['any'] ?? false;
         $any = filter_var($any, FILTER_VALIDATE_BOOLEAN);
         $limit = $indexes['limit'] ?? 10;
-        $comparator = $indexes['comparator'] ?? 'ilike';
+        $defaultComparator = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
+        $comparator = $indexes['comparator'] ?? $defaultComparator;
         $qcomparator = QueryAcceptedComparatorEnum::tryFrom($comparator) ?? QueryAcceptedComparatorEnum::EQUAL;
 
         if (isset($indexes['ignoreIds'])) {

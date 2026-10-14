@@ -43,8 +43,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        Passport::enablePasswordGrant();
-
         RateLimiter::for('api', function (Request $request) {
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
         });
@@ -108,6 +106,8 @@ class AppServiceProvider extends ServiceProvider
         Scramble::registerApi('api/v1', [
             'api_path' => 'api/v1',
         ]);
-        Route::pattern('idOrSlug', '[0-9]+|[a-z0-9-]+');
+        foreach (['user', 'example', 'role', 'permission', 'notification'] as $parameter) {
+            Route::pattern($parameter, '[0-9]+|[a-z0-9-]+');
+        }
     }
 }

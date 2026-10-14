@@ -12,4 +12,19 @@ return [
     ))),
 
     'authorization_server' => env('MCP_AUTHORIZATION_SERVER'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Tool Search
+    |--------------------------------------------------------------------------
+    |
+    | Limits enforced when a client searches or executes tools through the
+    | generated tool-search helpers.
+    |
+    */
+
+    'tool_search' => [
+        'max_tool_calls' => 10,
+        'max_output_bytes' => 65_536,
+    ],
 ];

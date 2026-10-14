@@ -22,9 +22,9 @@ class NotificationController extends BaseApiController
         return $this->respondOK($formattedResponse, __('messages.data_found'));
     }
 
-    public function markAsRead(Request $request, string $id): JsonResponse
+    public function markAsRead(Request $request, string $notification): JsonResponse
     {
-        $this->notificationService->markAsRead($request->user(), $id);
+        $this->notificationService->markAsRead($request->user(), $notification);
 
         return $this->respondOK(null, __('messages.resources_updated'));
     }
@@ -36,9 +36,9 @@ class NotificationController extends BaseApiController
         return $this->respondOK(null, __('messages.resources_updated'));
     }
 
-    public function destroy(Request $request, string $id): JsonResponse
+    public function destroy(Request $request, string $notification): JsonResponse
     {
-        $this->notificationService->delete($request->user(), $id);
+        $this->notificationService->delete($request->user(), $notification);
 
         return $this->respondOK(null, __('messages.resources_deleted'));
     }

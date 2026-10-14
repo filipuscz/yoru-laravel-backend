@@ -18,6 +18,7 @@ This application is a Laravel application and its main Laravel ecosystems packag
 - phpunit/phpunit (PHPUNIT) - v11
 
 ## Conventions
+- The default database is PostgreSQL. Use the `pgsql` connection. Do not add MySQL-only schema (`set()`, `->after()`) or MySQL-only SQL. Case-insensitive search uses `ILIKE`.
 - You must follow all existing code conventions used in this application. When creating or editing a file, check sibling files for the correct structure, approach, naming.
 - Use descriptive names for variables and methods. For example, `isRegisteredForDiscounts`, not `discount()`.
 - Check for existing components to reuse before writing a new one.

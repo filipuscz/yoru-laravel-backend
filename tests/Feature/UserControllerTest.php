@@ -43,7 +43,7 @@ class UserControllerTest extends TestCase
 
         $response = $this->actingAs($this->adminUser, 'api')
             ->withHeaders(['X-API-TOKEN' => $this->apiToken])
-            ->getJson('/api/v1/user');
+            ->getJson('/api/v1/users');
 
         $response->assertStatus(200)
             ->assertJsonStructure(['data', 'meta']);
@@ -60,7 +60,7 @@ class UserControllerTest extends TestCase
 
         $response = $this->actingAs($this->adminUser, 'api')
             ->withHeaders(['X-API-TOKEN' => $this->apiToken])
-            ->postJson('/api/v1/user', $payload);
+            ->postJson('/api/v1/users', $payload);
 
         $response->assertStatus(200)
             ->assertJsonPath('data.email', 'testuser@example.com');
@@ -71,13 +71,33 @@ class UserControllerTest extends TestCase
         ]);
     }
 
+    public function test_created_user_can_log_in_with_the_given_password(): void
+    {
+        $this->actingAs($this->adminUser, 'api')
+            ->withHeaders(['X-API-TOKEN' => $this->apiToken])
+            ->postJson('/api/v1/users', [
+                'name' => 'Loginable User',
+                'email' => 'loginable@example.com',
+                'username' => 'loginable',
+                'password' => 'secret123',
+            ])->assertOk();
+
+        $this->app['auth']->forgetGuards();
+        $this->app['auth']->shouldUse('web');
+
+        $this->postJson('/api/v1/auth/login', [
+            'username' => 'loginable@example.com',
+            'password' => 'secret123',
+        ])->assertOk();
+    }
+
     public function test_can_show_user()
     {
         $user = User::factory()->create();
 
         $response = $this->actingAs($this->adminUser, 'api')
             ->withHeaders(['X-API-TOKEN' => $this->apiToken])
-            ->getJson("/api/v1/user/show/{$user->id}");
+            ->getJson("/api/v1/users/{$user->id}");
 
         $response->assertStatus(200)
             ->assertJsonPath('data.id', $user->id);
@@ -94,7 +114,7 @@ class UserControllerTest extends TestCase
 
         $response = $this->actingAs($this->adminUser, 'api')
             ->withHeaders(['X-API-TOKEN' => $this->apiToken])
-            ->putJson("/api/v1/user/update/{$user->id}", $payload);
+            ->putJson("/api/v1/users/{$user->id}", $payload);
 
         $response->assertStatus(200)
             ->assertJsonPath('data.name', 'Updated Name');
@@ -111,7 +131,7 @@ class UserControllerTest extends TestCase
 
         $response = $this->actingAs($this->adminUser, 'api')
             ->withHeaders(['X-API-TOKEN' => $this->apiToken])
-            ->deleteJson("/api/v1/user/delete/{$user->id}");
+            ->deleteJson("/api/v1/users/{$user->id}");
 
         $response->assertStatus(200);
 
@@ -133,7 +153,7 @@ class UserControllerTest extends TestCase
 
         $response = $this->actingAs($this->adminUser, 'api')
             ->withHeaders(['X-API-TOKEN' => $this->apiToken])
-            ->putJson('/api/v1/user/bulk_action/update', $payload);
+            ->postJson('/api/v1/users/bulk-update', $payload);
 
         $response->assertStatus(200);
 
@@ -156,7 +176,7 @@ class UserControllerTest extends TestCase
 
         $response = $this->actingAs($this->adminUser, 'api')
             ->withHeaders(['X-API-TOKEN' => $this->apiToken])
-            ->deleteJson('/api/v1/user/bulk_action/destroy', $payload);
+            ->postJson('/api/v1/users/bulk-delete', $payload);
 
         $response->assertStatus(200);
 

@@ -55,17 +55,18 @@ return new class extends Migration
             $table->jsonb('jsonb_column')->nullable();
             $table->binary('binary_column')->nullable();
             $table->enum('enum_column', ['active', 'inactive', 'pending']);
-            $table->set('set_column', ['reading', 'coding', 'gaming']);
+            // PostgreSQL has no SET type. Members stay a comma-separated string.
+            $table->string('set_column');
 
             // Network
             $table->ipAddress('ip_address_column')->nullable();
             $table->macAddress('mac_address_column')->nullable();
 
-            // Spatial (Supported by many DBs like MySQL/PostgreSQL)
-            $table->geometry('geometry_column')->nullable();
-            $table->geometry('point_column', 'point')->nullable();
-            $table->geometry('linestring_column', 'linestring')->nullable();
-            $table->geometry('polygon_column', 'polygon')->nullable();
+            // WKT text. Native geometry needs the PostGIS extension, which is not part of stock PostgreSQL.
+            $table->text('geometry_column')->nullable();
+            $table->text('point_column')->nullable();
+            $table->text('linestring_column')->nullable();
+            $table->text('polygon_column')->nullable();
 
             // Foreign Keys
             $table->foreignId('user_id')->nullable()->constrained('me_users')->onDelete('cascade');

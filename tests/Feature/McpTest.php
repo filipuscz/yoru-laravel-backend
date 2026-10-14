@@ -25,6 +25,45 @@ class McpTest extends TestCase
             ->assertUnauthorized();
     }
 
+    public function test_guest_cannot_discover_the_mcp_server(): void
+    {
+        $request = $this->discoverRequest();
+
+        $this->postJson('/mcp/v1', $request, $this->mcpHeaders($request))
+            ->assertUnauthorized();
+    }
+
+    public function test_authenticated_user_can_discover_the_empty_mcp_server(): void
+    {
+        $user = User::factory()->create();
+
+        Passport::actingAs($user, ['mcp:use'], 'api');
+
+        $request = $this->discoverRequest();
+
+        $response = $this->postJson('/mcp/v1', $request, $this->mcpHeaders($request))
+            ->assertOk()
+            ->assertJsonPath('result.supportedVersions.0', '2026-07-28')
+            ->assertJsonPath('result.capabilities.tools.listChanged', false)
+            ->assertJsonPath('result.capabilities.resources.listChanged', false)
+            ->assertJsonPath('result.capabilities.prompts.listChanged', false)
+            ->assertJsonPath(
+                'result.instructions',
+                'This server is an intentionally empty, authenticated template. Add narrowly scoped tools only after validating their inputs, authorizing the authenticated user, and delegating domain work to application services.',
+            );
+
+        $meta = $response->json('result._meta');
+
+        $this->assertIsArray($meta);
+
+        $serverInfo = $meta['io.modelcontextprotocol/serverInfo'];
+
+        $this->assertIsArray($serverInfo);
+
+        $this->assertSame('Backend Template MCP Server', $serverInfo['name']);
+        $this->assertSame('1.0.0', $serverInfo['version']);
+    }
+
     public function test_authenticated_user_can_initialize_the_empty_mcp_server(): void
     {
         $user = User::factory()->create();
@@ -83,6 +122,36 @@ class McpTest extends TestCase
             'client_name' => 'Desktop Client',
             'redirect_uris' => ['cursor://oauth/callback'],
         ])->assertCreated();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function discoverRequest(): array
+    {
+        return [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'server/discover',
+            'params' => [
+                '_meta' => [
+                    'io.modelcontextprotocol/protocolVersion' => '2026-07-28',
+                    'io.modelcontextprotocol/clientCapabilities' => [],
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $message
+     * @return array<string, string>
+     */
+    private function mcpHeaders(array $message): array
+    {
+        return [
+            'MCP-Protocol-Version' => '2026-07-28',
+            'Mcp-Method' => (string) $message['method'],
+        ];
     }
 
     /**

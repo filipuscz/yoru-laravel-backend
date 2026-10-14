@@ -56,9 +56,9 @@ class UserController extends BaseApiController
         ]);
     }
 
-    public function show(ShowRequest $request, string $idOrSlug): JsonResponse
+    public function show(ShowRequest $request, string $user): JsonResponse
     {
-        $data = $this->userService->findById($idOrSlug);
+        $data = $this->userService->findById($user);
         throw_if((empty($data)), new NotFoundHttpException(__('messages.data_not_found')));
 
         return $this->setStatusMsg('success')->respondOK([
@@ -66,9 +66,9 @@ class UserController extends BaseApiController
         ]);
     }
 
-    public function update(StoreUpdateRequest $request, string $idOrSlug): JsonResponse
+    public function update(StoreUpdateRequest $request, string $user): JsonResponse
     {
-        $data = $this->userService->update($request->all(), $idOrSlug);
+        $data = $this->userService->update($request->all(), $user);
 
         return $this->respondOK([
             'data' => new UserResource($data),
@@ -90,12 +90,12 @@ class UserController extends BaseApiController
         return $this->respondOK(null, __('messages.resources_updated', ['count' => $count]), true);
     }
 
-    public function destroy(DestroyRequest $request, string $idOrSlug): JsonResponse
+    public function destroy(DestroyRequest $request, string $user): JsonResponse
     {
-        $data = $this->userService->findById($idOrSlug);
+        $data = $this->userService->findById($user);
         throw_if(! $data, new NotFoundHttpException(__('messages.data_not_found')));
 
-        $this->userService->delete($idOrSlug);
+        $this->userService->delete($user);
 
         return $this->respondOK(null, __('messages.deleted'), true);
     }

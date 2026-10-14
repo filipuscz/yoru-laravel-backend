@@ -14,6 +14,12 @@ This document serves as the master guidelines file for AI Agents operating in th
 
 ## 2. Database & Eloquent Conventions (CRITICAL)
 
+- **Default engine is PostgreSQL**. The Laravel connection name is `pgsql` (`config/database.php` fallback and `.env.example`). Do not point new config, PHPUnit, or CI at `sqlite` or `mysql`.
+- **Local server**: PostgreSQL 16 runs as container `global_postgres` from `../docker-stack` (`docker compose --profile postgres up -d`). App database `yorupus_be_template`, test database `testing`, user `root`, password `123`, port `5432`, host `global_postgres`.
+- **PHP driver**: `pdo_pgsql` is required. `global_php84` provides it. Run database Artisan commands inside that container when the host PHP build has no `pdo_pgsql`: `docker exec -w /var/www/yoru-laravel-backend global_php84 php artisan migrate --no-interaction --force`.
+- **Tests**: `phpunit.xml` uses `pgsql` / database `testing` / host `127.0.0.1` so GitHub Actions and a published port work. Inside `global_php84`, pass `DB_HOST=global_postgres` or PHPUnit targets the container loopback.
+- **Schema**: Do not use MySQL-only blueprint calls (`set()`, `->after()`). Do not add `geometry` / `geography` columns unless PostGIS is installed. `enum()` is valid (Laravel emits a check constraint). Prefer `jsonb()` when JSON will be queried.
+- **Queries**: On PostgreSQL, `LIKE` is case-sensitive and `ILIKE` is the case-insensitive operator. List search defaults to `ilike` and casts non-text columns to text. Do not use MySQL functions such as `IFNULL`, `GROUP_CONCAT`, `FIND_IN_SET`, or `DATE_FORMAT`.
 - **Mandatory Table Prefixes**: Every table name MUST begin with the approved system prefix (`me_` for Master Entity, `tb_` for Transaction Base, `st_` for Setup/Static, `mg_` for Management).
 - **Format**: All table names must be written in lowercase `snake_case`.
 - **Eloquent Binding**: When creating or modifying Eloquent Models, you MUST explicitly define the `$table` property with the prefixed table name.
@@ -43,7 +49,7 @@ This document serves as the master guidelines file for AI Agents operating in th
 - **Mandatory Verification**: Before concluding *every* prompt or task, you MUST run the following three commands to guarantee codebase stability:
   1. `vendor/bin/pint --test`
   2. `vendor/bin/phpstan analyse --error-format=github`
-  3. `php artisan test`
+  3. `php artisan test` (inside `global_php84`, run `docker exec -w /var/www/yoru-laravel-backend -e DB_HOST=global_postgres global_php84 php artisan test`)
 - This application uses **PHPUnit** exclusively. Convert any Pest tests to PHPUnit. Use `php artisan make:test --phpunit {name}`.
 - Run the minimal relevant test set using `php artisan test --filter=testName` during development, but always run the full suite at the end.
 - **Spatie Permissions in Tests**: Guarded permissions (e.g., `guard_name => 'api'`) require explicit lookup via `Permission::whereIn('name', [...])->get()` when assigning to models in tests to avoid `PermissionDoesNotExist` exceptions.

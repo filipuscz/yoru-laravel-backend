@@ -13,8 +13,8 @@ return new class extends Migration
     {
         if (! Schema::hasColumn('me_users', 'is_active')) {
             Schema::table('me_users', function (Blueprint $table) {
-                $table->boolean('is_active')->after('remember_token')->default(false);
-                $table->timestamp('last_login_at')->after('is_active')->nullable();
+                $table->boolean('is_active')->default(false);
+                $table->timestamp('last_login_at')->nullable();
             });
         }
     }

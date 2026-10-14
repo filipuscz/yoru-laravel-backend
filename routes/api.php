@@ -9,108 +9,53 @@ use App\Http\Controllers\Api\v1\RoleController;
 use App\Http\Controllers\Api\v1\SettingController;
 use App\Http\Controllers\Api\v1\UserController;
 use App\Http\Middleware\CheckApiToken;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Spatie\Permission\Middleware\RoleMiddleware;
 
-// Route::get('/user', function (Request $request) {
-//     return $request->user();
-// })->middleware('auth:api');
-
 Route::prefix('v1')
     ->name('api.v1.')
-    ->middleware(CheckApiToken::class)
+    ->middleware([CheckApiToken::class, 'throttle:api'])
     ->group(function () {
-        Route::name('setting.')
-            ->prefix('setting')
-            ->middleware('auth:api')
-            ->controller(SettingController::class)
-            ->group(function () {
-                Route::get('/', 'index')->name('index');
-                Route::put('/bulk_action/update', 'bulkUpdate')->name('bulk_action.update');
-            });
+        Route::middleware('auth:api')->group(function () {
+            Route::get('settings', [SettingController::class, 'index'])->name('settings.index');
+            Route::patch('settings', [SettingController::class, 'bulkUpdate'])->name('settings.update');
 
-        Route::name('notification.')
-            ->prefix('notification')
-            ->middleware('auth:api')
-            ->controller(NotificationController::class)
-            ->group(function () {
-                Route::get('/', 'index')->name('index');
-                Route::put('/mark-all-as-read', 'markAllAsRead')->name('mark_all_as_read');
-                Route::put('/{id}/mark-as-read', 'markAsRead')->name('mark_as_read');
-                Route::delete('/{id}', 'destroy')->name('destroy');
-            });
+            Route::post('notifications/read', [NotificationController::class, 'markAllAsRead'])->name('notifications.read');
+            Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
+            Route::post('notifications/{notification}/read', [NotificationController::class, 'markAsRead'])->name('notifications.mark-read');
+            Route::delete('notifications/{notification}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
 
-        Route::name('user.')
-            ->prefix('user')
-            ->middleware('auth:api')
-            ->controller(UserController::class)
-            ->group(function () {
-                Route::get('/', 'index')->name('index');
-                Route::post('/', 'store')->name('store');
-                Route::get('/show/{idOrSlug}', 'show')->name('show');
-                Route::put('/update/{idOrSlug}', 'update')->name('update');
-                Route::delete('/delete/{idOrSlug}', 'destroy')->name('delete');
-                Route::put('/bulk_action/update', 'bulkUpdate')->name('bulk_action.update');
-                Route::match(['delete', 'post'], '/bulk_action/destroy', 'bulkDestroy')->name('bulk_action.destroy');
-            });
+            Route::post('users/bulk-update', [UserController::class, 'bulkUpdate'])->name('users.bulk-update');
+            Route::post('users/bulk-delete', [UserController::class, 'bulkDestroy'])->name('users.bulk-delete');
+            Route::apiResource('users', UserController::class);
 
-        Route::name('example.')
-            ->prefix('example')
-            ->middleware('auth:api')
-            ->controller(ExampleController::class)
-            ->group(function () {
-                Route::get('/', 'index')->name('index');
-                Route::post('/', 'store')->name('store');
-                Route::get('/show/{idOrSlug}', 'show')->name('show');
-                Route::put('/update/{idOrSlug}', 'update')->name('update');
-                Route::delete('/delete/{idOrSlug}', 'destroy')->name('delete');
-                Route::put('/bulk_action/update', 'bulkUpdate')->name('bulk_action.update');
-                Route::match(['delete', 'post'], '/bulk_action/destroy', 'bulkDestroy')->name('bulk_action.destroy');
-            });
+            Route::post('examples/bulk-update', [ExampleController::class, 'bulkUpdate'])->name('examples.bulk-update');
+            Route::post('examples/bulk-delete', [ExampleController::class, 'bulkDestroy'])->name('examples.bulk-delete');
+            Route::apiResource('examples', ExampleController::class);
 
-        Route::name('role.')
-            ->prefix('role')
-            ->middleware(['auth:api', RoleMiddleware::class.':admin'])
-            ->controller(RoleController::class)
-            ->group(function () {
-                Route::get('/', 'index')->name('index');
-                Route::post('/', 'store')->name('store');
-                Route::get('/show/{idOrSlug}', 'show')->name('show');
-                Route::put('/update/{idOrSlug}', 'update')->name('update');
-                Route::delete('/delete/{idOrSlug}', 'destroy')->name('delete');
-                Route::put('/bulk_action/update', 'bulkUpdate')->name('bulk_action.update');
-                Route::match(['delete', 'post'], '/bulk_action/destroy', 'bulkDestroy')->name('bulk_action.destroy');
-            });
+            Route::middleware(RoleMiddleware::using('admin', 'api'))->group(function () {
+                Route::post('roles/bulk-update', [RoleController::class, 'bulkUpdate'])->name('roles.bulk-update');
+                Route::post('roles/bulk-delete', [RoleController::class, 'bulkDestroy'])->name('roles.bulk-delete');
+                Route::apiResource('roles', RoleController::class);
 
-        Route::name('permission.')
-            ->prefix('permission')
-            ->middleware(['auth:api', RoleMiddleware::class.':admin'])
-            ->controller(PermissionController::class)
-            ->group(function () {
-                Route::get('/', 'index')->name('index');
-                Route::post('/', 'store')->name('store');
-                Route::get('/show/{idOrSlug}', 'show')->name('show');
-                Route::put('/update/{idOrSlug}', 'update')->name('update');
-                Route::delete('/delete/{idOrSlug}', 'destroy')->name('delete');
-                Route::put('/bulk_action/update', 'bulkUpdate')->name('bulk_action.update');
-                Route::match(['delete', 'post'], '/bulk_action/destroy', 'bulkDestroy')->name('bulk_action.destroy');
+                Route::post('permissions/bulk-update', [PermissionController::class, 'bulkUpdate'])->name('permissions.bulk-update');
+                Route::post('permissions/bulk-delete', [PermissionController::class, 'bulkDestroy'])->name('permissions.bulk-delete');
+                Route::apiResource('permissions', PermissionController::class);
             });
+        });
+
         Route::name('auth.')
             ->prefix('auth')
             ->controller(AuthController::class)
             ->group(function () {
                 Route::post('/login', 'login')->name('login')->middleware(['guest', 'throttle:auth:login'])->withoutMiddleware(CheckApiToken::class);
                 Route::post('/logout', 'logout')->name('logout')->middleware('auth:api');
-                Route::post('/register', 'register')->name('register')->middleware(['guest', 'throttle:auth:register']);
+                Route::post('/register', 'register')->name('register')->middleware(['guest', 'throttle:auth:register'])->withoutMiddleware(CheckApiToken::class);
                 Route::get('/me', 'me')->name('me')->middleware('auth:api');
                 Route::get('/api-token', 'generateApiToken')->name('api-token')->middleware('auth:api')->withoutMiddleware(CheckApiToken::class);
             });
 
-        Route::name('language.')
-            ->prefix('language')
-            ->controller(LanguageController::class)
-            ->group(function () {
-                Route::get('/{locale}', 'show')->name('show')->withoutMiddleware(CheckApiToken::class);
-            });
+        Route::get('languages/{locale}', [LanguageController::class, 'show'])
+            ->name('languages.show')
+            ->withoutMiddleware(CheckApiToken::class);
     });

@@ -11,7 +11,7 @@ class LanguageControllerTest extends TestCase
      */
     public function test_it_can_fetch_existing_translations_for_en(): void
     {
-        $response = $this->getJson('/api/v1/language/en');
+        $response = $this->getJson('/api/v1/languages/en');
 
         $response->assertStatus(200)
             ->assertJsonStructure([
@@ -28,7 +28,7 @@ class LanguageControllerTest extends TestCase
      */
     public function test_it_returns_404_for_non_existent_language(): void
     {
-        $response = $this->getJson('/api/v1/language/xx-non-existent');
+        $response = $this->getJson('/api/v1/languages/xx-non-existent');
 
         $response->assertStatus(404)
             ->assertJsonPath('message', 'Language not found');
@@ -41,7 +41,7 @@ class LanguageControllerTest extends TestCase
     {
         // This is essentially the same as the first test but explicitly verifies
         // that a guest request (no actingAs) succeeds.
-        $response = $this->getJson('/api/v1/language/en');
+        $response = $this->getJson('/api/v1/languages/en');
 
         $response->assertStatus(200);
     }

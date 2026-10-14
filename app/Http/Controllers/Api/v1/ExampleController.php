@@ -69,9 +69,9 @@ class ExampleController extends BaseApiController
      *
      * @response array{success: string, message: string, status: string, code: integer, data: array{}}
      */
-    public function show(ShowRequest $request, string $idOrSlug): JsonResponse
+    public function show(ShowRequest $request, string $example): JsonResponse
     {
-        $data = $this->exampleService->findById($idOrSlug);
+        $data = $this->exampleService->findById($example);
         throw_if((empty($data)), new NotFoundHttpException(__('messages.data_not_found')));
 
         return $this->setStatusMsg('success')->respondOK([
@@ -89,9 +89,9 @@ class ExampleController extends BaseApiController
      *
      * @response array{success: string, message: string, status: string, code: integer, data: array{}}
      */
-    public function update(StoreUpdateRequest $request, string $idOrSlug): JsonResponse
+    public function update(StoreUpdateRequest $request, string $example): JsonResponse
     {
-        $data = $this->exampleService->update($request->all(), $idOrSlug);
+        $data = $this->exampleService->update($request->all(), $example);
 
         return $this->respondOK([
             'data' => new ExampleResource($data),
@@ -124,12 +124,12 @@ class ExampleController extends BaseApiController
      *
      * @response array{success: string, message: string, status: string, code: integer}
      */
-    public function destroy(DestroyRequest $request, string $idOrSlug): JsonResponse
+    public function destroy(DestroyRequest $request, string $example): JsonResponse
     {
-        $data = $this->exampleService->findById($idOrSlug);
+        $data = $this->exampleService->findById($example);
         throw_if(! $data, new NotFoundHttpException(__('messages.data_not_found')));
 
-        $this->exampleService->delete($idOrSlug);
+        $this->exampleService->delete($example);
 
         return $this->respondOK(null, __('messages.deleted'), true);
     }

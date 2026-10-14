@@ -41,7 +41,7 @@ class RoleControllerTest extends TestCase
 
         $response = $this->actingAs($this->adminUser, 'api')
             ->withHeaders(['X-API-TOKEN' => $this->apiToken])
-            ->getJson('/api/v1/role');
+            ->getJson('/api/v1/roles');
 
         $response->assertStatus(200)
             ->assertJsonStructure(['data', 'meta']);
@@ -55,7 +55,7 @@ class RoleControllerTest extends TestCase
 
         $response = $this->actingAs($this->adminUser, 'api')
             ->withHeaders(['X-API-TOKEN' => $this->apiToken])
-            ->postJson('/api/v1/role', $payload);
+            ->postJson('/api/v1/roles', $payload);
 
         $response->assertStatus(200)
             ->assertJsonPath('data.name', 'editor');
@@ -71,7 +71,7 @@ class RoleControllerTest extends TestCase
 
         $response = $this->actingAs($this->adminUser, 'api')
             ->withHeaders(['X-API-TOKEN' => $this->apiToken])
-            ->getJson("/api/v1/role/show/{$role->id}");
+            ->getJson("/api/v1/roles/{$role->id}");
 
         $response->assertStatus(200)
             ->assertJsonPath('data.id', $role->id);
@@ -87,7 +87,7 @@ class RoleControllerTest extends TestCase
 
         $response = $this->actingAs($this->adminUser, 'api')
             ->withHeaders(['X-API-TOKEN' => $this->apiToken])
-            ->putJson("/api/v1/role/update/{$role->id}", $payload);
+            ->putJson("/api/v1/roles/{$role->id}", $payload);
 
         $response->assertStatus(200)
             ->assertJsonPath('data.name', 'new_name');
@@ -104,7 +104,7 @@ class RoleControllerTest extends TestCase
 
         $response = $this->actingAs($this->adminUser, 'api')
             ->withHeaders(['X-API-TOKEN' => $this->apiToken])
-            ->deleteJson("/api/v1/role/delete/{$role->id}");
+            ->deleteJson("/api/v1/roles/{$role->id}");
 
         $response->assertStatus(200);
 
@@ -127,7 +127,7 @@ class RoleControllerTest extends TestCase
 
         $response = $this->actingAs($this->adminUser, 'api')
             ->withHeaders(['X-API-TOKEN' => $this->apiToken])
-            ->putJson('/api/v1/role/bulk_action/update', $payload);
+            ->postJson('/api/v1/roles/bulk-update', $payload);
 
         $response->assertStatus(200);
     }
@@ -143,7 +143,7 @@ class RoleControllerTest extends TestCase
 
         $response = $this->actingAs($this->adminUser, 'api')
             ->withHeaders(['X-API-TOKEN' => $this->apiToken])
-            ->deleteJson('/api/v1/role/bulk_action/destroy', $payload);
+            ->postJson('/api/v1/roles/bulk-delete', $payload);
 
         $response->assertStatus(200);
 

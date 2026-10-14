@@ -16,7 +16,7 @@ class StoreUpdateRequest extends FormRequest
 
     public function rules(): array
     {
-        $id = $this->route('idOrSlug');
+        $id = $this->route('role');
 
         return [
             'name' => [

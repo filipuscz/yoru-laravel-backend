@@ -43,9 +43,9 @@ class PermissionController extends BaseApiController
         ]);
     }
 
-    public function show(string $idOrSlug): JsonResponse
+    public function show(string $permission): JsonResponse
     {
-        $data = $this->permissionService->findById($idOrSlug);
+        $data = $this->permissionService->findById($permission);
         throw_if((empty($data)), new NotFoundHttpException(__('messages.data_not_found')));
 
         return $this->setStatusMsg('success')->respondOK([
@@ -53,9 +53,9 @@ class PermissionController extends BaseApiController
         ]);
     }
 
-    public function update(StoreUpdateRequest $request, string $idOrSlug): JsonResponse
+    public function update(StoreUpdateRequest $request, string $permission): JsonResponse
     {
-        $data = $this->permissionService->update($request->all(), $idOrSlug);
+        $data = $this->permissionService->update($request->all(), $permission);
 
         return $this->respondOK([
             'data' => new PermissionResource($data),
@@ -77,12 +77,12 @@ class PermissionController extends BaseApiController
         return $this->respondOK(null, __('messages.resources_updated', ['count' => $count]), true);
     }
 
-    public function destroy(string $idOrSlug): JsonResponse
+    public function destroy(string $permission): JsonResponse
     {
-        $data = $this->permissionService->findById($idOrSlug);
+        $data = $this->permissionService->findById($permission);
         throw_if(! $data, new NotFoundHttpException(__('messages.data_not_found')));
 
-        $this->permissionService->delete($idOrSlug);
+        $this->permissionService->delete($permission);
 
         return $this->respondOK(null, __('messages.deleted'), true);
     }

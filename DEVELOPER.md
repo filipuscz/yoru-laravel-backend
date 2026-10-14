@@ -7,24 +7,69 @@ Base URL: `http://localhost:8000/api/v1`
 
 ---
 
+## Database
+
+PostgreSQL 16 is the default database. It runs in Docker as `global_postgres` from `../docker-stack`.
+
+```bash
+cd ../docker-stack
+docker compose --profile postgres up -d
+docker exec global_postgres psql -U root -d postgres -c "CREATE DATABASE yorupus_be_template;"
+docker exec global_postgres psql -U root -d postgres -c "CREATE DATABASE testing;"
+```
+
+Copy `.env.example` to `.env`. The database values are:
+
+```dotenv
+DB_CONNECTION=pgsql
+DB_HOST=global_postgres
+DB_PORT=5432
+DB_DATABASE=yorupus_be_template
+DB_USERNAME=root
+DB_PASSWORD=123
+```
+
+`global_postgres` resolves inside the Docker network and on this WSL host. `global_php84` must have `pdo_pgsql` (it is installed in `Dockerfile-php84`). Migrate from that container:
+
+```bash
+docker exec -w /var/www/yoru-laravel-backend global_php84 php artisan migrate --no-interaction --force
+```
+
+PHPUnit uses the `testing` database. From the PHP container, set the host so the test process does not use `127.0.0.1` inside the container:
+
+```bash
+docker exec -w /var/www/yoru-laravel-backend -e DB_HOST=global_postgres global_php84 php artisan test
+```
+
+Schema and query rules for this engine:
+
+- Do not use MySQL-only column helpers (`set()`, `->after()`).
+- Do not add `geometry` columns unless PostGIS is installed. The examples table stores spatial values as text.
+- `LIKE` is case-sensitive. Case-insensitive matching uses `ILIKE`.
+- Pattern search casts non-text columns to text so PostgreSQL accepts the comparison.
+
+---
+
 ## Global Query Parameters
 
-All list endpoints (`GET /user`, `GET /role`, `GET /notification`, etc.) driven by the `BaseService` support the following global parameters:
+All list endpoints (`GET /users`, `GET /roles`, `GET /notifications`, etc.) driven by the `BaseService` support the following global parameters:
 
 - `limit`: The number of records to return per page (default: 10 or 15). Use `-1` to fetch all records (disables pagination).
 - `page`: The offset page number to retrieve.
+- `search`: Free-text match. On PostgreSQL this is case-insensitive (`ILIKE`), including non-text columns cast to text.
+- `comparator`: Comparison operator for indexed filters. Accepted values: `=`, `!=`, `like`, `ilike`, `>`, `<`. When omitted, PostgreSQL defaults to `ilike`.
 - `use_cursor`: Set to `true` to use highly-performant cursor pagination instead of standard offset pagination.
 - `cursor`: The encoded cursor string provided from the previous request's `next_cursor` to fetch the next batch.
 
 **Example: Requesting the first page with cursor pagination**
 ```http
-GET /user?use_cursor=true&limit=15
+GET /users?use_cursor=true&limit=15
 Authorization: Bearer <token>
 ```
 
 **Example: Next Page Request (using the cursor from previous response)**
 ```http
-GET /user?use_cursor=true&cursor=eyJpZCI6MTUsIl9wb2ludHNUb05leHRJdGVtcyI6dHJ1ZX0=&limit=15
+GET /users?use_cursor=true&cursor=eyJpZCI6MTUsIl9wb2ludHNUb05leHRJdGVtcyI6dHJ1ZX0=&limit=15
 Authorization: Bearer <token>
 ```
 
@@ -87,13 +132,13 @@ Manage global application settings natively. These directly override Laravel con
 
 **List Settings**
 ```http
-GET /setting
+GET /settings
 Authorization: Bearer <token>
 ```
 
 **Bulk Update Settings**
 ```http
-PUT /setting/bulk_action/update
+PATCH /settings
 Authorization: Bearer <token>
 Content-Type: application/json
 
@@ -116,25 +161,25 @@ Manage the authenticated user's database notifications.
 
 **List User's Notifications**
 ```http
-GET /notification?limit=15
+GET /notifications?limit=15
 Authorization: Bearer <token>
 ```
 
 **Mark Specific Notification as Read**
 ```http
-PUT /notification/{notification_id}/mark-as-read
+POST /notifications/{notification_id}/read
 Authorization: Bearer <token>
 ```
 
 **Mark All Notifications as Read**
 ```http
-PUT /notification/mark-all-as-read
+POST /notifications/read
 Authorization: Bearer <token>
 ```
 
 **Delete a Notification**
 ```http
-DELETE /notification/{notification_id}
+DELETE /notifications/{notification_id}
 Authorization: Bearer <token>
 ```
 
@@ -160,14 +205,14 @@ Full management of users, their profile details, and their roles.
 
 **List Users**
 ```http
-GET /user?limit=10&page=1
+GET /users?limit=10&page=1
 Authorization: Bearer <token>
 ```
 
 **Create User**
 *(Automatically hashes password and syncs roles & profile details)*
 ```http
-POST /user
+POST /users
 Authorization: Bearer <token>
 Content-Type: application/json
 
@@ -183,7 +228,7 @@ Content-Type: application/json
 
 **Update User**
 ```http
-PUT /user/{user_id}
+PUT /users/{user_id}
 Authorization: Bearer <token>
 Content-Type: application/json
 
@@ -196,7 +241,7 @@ Content-Type: application/json
 
 **Delete User**
 ```http
-DELETE /user/{user_id}
+DELETE /users/{user_id}
 Authorization: Bearer <token>
 ```
 
@@ -207,13 +252,13 @@ Role-Based Access Control (RBAC) via Spatie.
 
 **List Roles**
 ```http
-GET /role
+GET /roles
 Authorization: Bearer <token>
 ```
 
 **Create Role (and assign permissions)**
 ```http
-POST /role
+POST /roles
 Authorization: Bearer <token>
 Content-Type: application/json
 
@@ -225,7 +270,7 @@ Content-Type: application/json
 
 **List Permissions**
 ```http
-GET /permission
+GET /permissions
 Authorization: Bearer <token>
 ```
 ```
@@ -237,7 +282,7 @@ Expose the backend Laravel localization files (e.g. `messages.php`, `validation.
 
 **Get Translations by Locale**
 ```http
-GET /language/{locale}
+GET /languages/{locale}
 ```
 *Note: This endpoint is accessible without an authentication token so the frontend can load translations before login.*
 
@@ -282,6 +327,21 @@ curl https://api.example.com/.well-known/oauth-authorization-server
 
 The server endpoint is `POST /mcp/v1`. It is not under `/api/v1` and does not use `X-API-TOKEN`; MCP clients authenticate with Passport OAuth instead. An unauthenticated request receives a `WWW-Authenticate` header pointing the client to the protected-resource metadata.
 
+Current clients speak protocol revision `2026-07-28`. They open with `server/discover` and send `MCP-Protocol-Version` and `Mcp-Method` headers that match the JSON-RPC body. Calls to `tools/call`, `prompts/get`, and `resources/read` also send `Mcp-Name`. Each modern request includes this metadata:
+
+```json
+{
+  "params": {
+    "_meta": {
+      "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+      "io.modelcontextprotocol/clientCapabilities": {}
+    }
+  }
+}
+```
+
+Clients that still open with `initialize` and protocol revision `2025-11-25` or `2025-06-18` continue to work. Those legacy requests omit `_meta` and the MCP HTTP headers.
+
 ### 7.3 Connect an MCP client
 
 Add a remote MCP server in a client that supports OAuth 2.1 and dynamic client registration. Use this URL:
@@ -312,8 +372,10 @@ use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
 #[Description('Lists users the authenticated user is allowed to view.')]
+#[IsReadOnly]
 class ListUsers extends Tool
 {
     public function schema(JsonSchema $schema): array
@@ -377,7 +439,11 @@ vendor/bin/phpstan analyse --error-format=github
 ```
 
 **3. Feature & Unit Testing (PHPUnit)**
-Ensure no business logic or API endpoints are broken.
+Ensure no business logic or API endpoints are broken. Tests run against PostgreSQL database `testing`.
 ```bash
 php artisan test
+```
+From `global_php84`, override the host:
+```bash
+docker exec -w /var/www/yoru-laravel-backend -e DB_HOST=global_postgres global_php84 php artisan test
 ```

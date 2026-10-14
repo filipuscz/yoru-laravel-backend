@@ -44,6 +44,20 @@ class AuthControllerTest extends TestCase
         ]);
     }
 
+    public function test_user_can_register_without_api_token(): void
+    {
+        $response = $this->postJson('/api/v1/auth/register', [
+            'name' => 'Public User',
+            'username' => 'publicuser',
+            'email' => 'public@example.com',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonStructure(['data', 'token']);
+    }
+
     public function test_user_can_login()
     {
         $this->withoutExceptionHandling();

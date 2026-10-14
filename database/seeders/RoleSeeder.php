@@ -33,7 +33,10 @@ class RoleSeeder extends Seeder
         ];
 
         foreach ($permissions as $permission) {
-            Permission::updateOrCreate(['name' => $permission]);
+            Permission::updateOrCreate([
+                'name' => $permission,
+                'guard_name' => 'api',
+            ]);
         }
 
         // Seed initial SMTP settings
@@ -51,13 +54,20 @@ class RoleSeeder extends Seeder
             Setting::updateOrCreate(['key' => $key], ['value' => $value]);
         }
 
-        // Standard international roles
-        $adminRole = Role::updateOrCreate(['name' => 'admin']);
-        $adminRole->givePermissionTo(Permission::all());
+        $apiPermissions = Permission::query()->where('guard_name', 'api')->get();
 
-        $userRole = Role::updateOrCreate(['name' => 'user']);
-        $userRole->givePermissionTo([
-            'view examples',
+        $adminRole = Role::updateOrCreate([
+            'name' => 'admin',
+            'guard_name' => 'api',
         ]);
+        $adminRole->givePermissionTo($apiPermissions);
+
+        $userRole = Role::updateOrCreate([
+            'name' => 'user',
+            'guard_name' => 'api',
+        ]);
+        $userRole->givePermissionTo(
+            $apiPermissions->where('name', 'view examples')->values()
+        );
     }
 }

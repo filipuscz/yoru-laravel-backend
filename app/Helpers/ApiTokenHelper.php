@@ -4,40 +4,33 @@ namespace App\Helpers;
 
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Crypt;
+use RuntimeException;
 
 class ApiTokenHelper
 {
-    public static function generate()
+    public static function generate(): string
     {
         $timestamp = now()->format('YmdHis');
         $random = bin2hex(random_bytes(8));
 
         $payload = "$timestamp|$random";
 
-        // Encrypt payload
         $encrypted = Crypt::encryptString($payload);
 
-        /** @phpstan-ignore larastan.noEnvCallsOutsideOfConfig */
-        $signature = hash_hmac('sha256', $encrypted, env('API_SECRET_KEY'));
+        $signature = hash_hmac('sha256', $encrypted, self::secret());
 
-        // Final token
         return base64_encode($encrypted.'.'.$signature);
     }
 
-    public static function validation($header)
+    public static function validation(string $header): bool
     {
-        /** @phpstan-ignore larastan.noEnvCallsOutsideOfConfig */
-        $secret = env('API_SECRET_KEY');
-        /** @phpstan-ignore larastan.noEnvCallsOutsideOfConfig */
-        $expiryHours = (int) env('API_TOKEN_EXPIRE_HOURS', 1);
-        // Extract token
+        $expiryHours = self::expireHours();
         $decoded = base64_decode($header);
         [$encrypted, $signature] = explode('.', $decoded);
 
-        // Validate signature
-        $expectedSignature = hash_hmac('sha256', $encrypted, $secret);
+        $expectedSignature = hash_hmac('sha256', $encrypted, self::secret());
         throw_if(! hash_equals($expectedSignature, $signature), new \Exception(__('exceptions.invalid_api_token_signature')));
-        // Decrypt payload
+
         $decrypted = Crypt::decryptString($encrypted);
         [$timestamp, $random] = explode('|', $decrypted);
         $tokenDate = Carbon::createFromFormat('YmdHis', $timestamp);
@@ -45,5 +38,21 @@ class ApiTokenHelper
         throw_if(now()->greaterThan($expiryTime), new \Exception(__('exceptions.api_token_expired')));
 
         return true;
+    }
+
+    private static function secret(): string
+    {
+        $secret = config('api.secret_key');
+
+        if (! is_string($secret) || $secret === '') {
+            throw new RuntimeException('API secret key is not configured.');
+        }
+
+        return $secret;
+    }
+
+    private static function expireHours(): int
+    {
+        return (int) config('api.token_expire_hours', 1);
     }
 }

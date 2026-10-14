@@ -7,6 +7,7 @@ use App\Enums\QueryAcceptedComparatorEnum;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Query\Grammars\PostgresGrammar;
 use Illuminate\Pagination\CursorPaginator;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -57,6 +58,31 @@ class BaseService implements IBaseService
         }
 
         return $this->tableColumns;
+    }
+
+    /**
+     * Case-insensitive match on PostgreSQL. Non-text columns are cast so ILIKE does not fail.
+     */
+    protected function wherePattern(Builder $query, string $column, string $pattern, bool $or = false): void
+    {
+        if ($query->getQuery()->getGrammar() instanceof PostgresGrammar) {
+            $wrapped = $query->getGrammar()->wrap($column);
+            $sql = "CAST({$wrapped} AS TEXT) ILIKE ?";
+
+            if ($or) {
+                $query->orWhereRaw($sql, [$pattern]);
+            } else {
+                $query->whereRaw($sql, [$pattern]);
+            }
+
+            return;
+        }
+
+        if ($or) {
+            $query->orWhere($column, QueryAcceptedComparatorEnum::LIKE->value, $pattern);
+        } else {
+            $query->where($column, QueryAcceptedComparatorEnum::LIKE->value, $pattern);
+        }
     }
 
     public function getModel(): Model
@@ -219,24 +245,36 @@ class BaseService implements IBaseService
         }
         $query->where(function ($query) use ($indexes, $comparator, $any, $columns) {
             foreach ($indexes as $column => $value) {
-                if ($comparator == QueryAcceptedComparatorEnum::LIKE) {
-                    $value = "%{$value}%";
+                if (! in_array($column, $columns)) {
+                    continue;
                 }
-                if (in_array($column, $columns)) {
-                    if (is_array($value)) {
-                        $query->when($any, function ($query) use ($column, $value) {
-                            $query->orWhereIn($column, $value);
-                        }, function ($query) use ($column, $value) {
-                            $query->whereIn($column, $value);
-                        });
-                    } else {
-                        $query->when($any, function ($query) use ($column, $comparator, $value) {
-                            $query->orWhere($column, $comparator->value, $value);
-                        }, function ($query) use ($column, $comparator, $value) {
-                            $query->where($column, $comparator->value, $value);
-                        });
-                    }
+
+                $isPattern = in_array($comparator, [
+                    QueryAcceptedComparatorEnum::LIKE,
+                    QueryAcceptedComparatorEnum::ILIKE,
+                ], true);
+
+                if ($isPattern && ! is_array($value)) {
+                    $this->wherePattern($query, $column, '%'.$value.'%', $any);
+
+                    continue;
                 }
+
+                if (is_array($value)) {
+                    $query->when($any, function ($query) use ($column, $value) {
+                        $query->orWhereIn($column, $value);
+                    }, function ($query) use ($column, $value) {
+                        $query->whereIn($column, $value);
+                    });
+
+                    continue;
+                }
+
+                $query->when($any, function ($query) use ($column, $comparator, $value) {
+                    $query->orWhere($column, $comparator->value, $value);
+                }, function ($query) use ($column, $comparator, $value) {
+                    $query->where($column, $comparator->value, $value);
+                });
             }
         });
         $query->when(isset($indexes['search']), function ($query) use ($indexes, $fields, $columns) {
@@ -248,7 +286,7 @@ class BaseService implements IBaseService
             $query->where(function ($query) use ($indexes, $fields, $columns) {
                 foreach ($fields as $target) {
                     if (in_array($target, $columns)) {
-                        $query->orWhere($target, QueryAcceptedComparatorEnum::LIKE->value, '%'.$indexes['search'].'%');
+                        $this->wherePattern($query, $target, '%'.$indexes['search'].'%', true);
                     }
                 }
             });
