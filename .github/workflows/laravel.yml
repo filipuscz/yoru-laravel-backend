@@ -44,11 +44,13 @@ jobs:
     - name: Generate App Key
       run: php artisan key:generate
       
-    - name: Generate Passport Keys
-      run: php artisan passport:keys --force --no-interaction
-
     - name: Directory Permissions
       run: chmod -R 777 storage bootstrap/cache
+
+    # passport:keys sets oauth-private.key to 600. This must stay after the
+    # recursive chmod, or league/oauth2-server rejects the key as mode 777.
+    - name: Generate Passport Keys
+      run: php artisan passport:keys --force --no-interaction
       
     - name: Check Code Formatting (Pint)
       run: vendor/bin/pint --test

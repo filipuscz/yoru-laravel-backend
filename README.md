@@ -1,22 +1,35 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Yoru Laravel Backend
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Laravel API template for new Yoru backends. Controllers stay thin, services own persistence, and every JSON response uses the same envelope.
 
-## Yoru Laravel Backend
+## Stack
 
-This repository is a Laravel API template. The default database is **PostgreSQL** (`DB_CONNECTION=pgsql`), served by container `global_postgres` in `../docker-stack`.
+- PHP 8.4, Laravel 13
+- Laravel Passport for bearer tokens
+- Spatie Permission for roles and permissions on the `api` guard
+- PostgreSQL
+- PHPUnit, Pint, and PHPStan
+
+## What you get
+
+- Versioned routes under `/api/v1`
+- Register, login, logout, and the current user
+- Users, examples, roles, permissions, settings, and notifications
+- Shared list queries: search, filters, paging, and cursor paging
+- Table prefixes: `me_` master, `tb_` transaction, `st_` setup, `mg_` management
+
+`Example` is the module to copy when adding a resource. Endpoint payloads and headers are in [DEVELOPER.md](DEVELOPER.md). Agent and schema rules are in [AGENTS.md](AGENTS.md).
+
+## Setup
+
+PostgreSQL runs in Docker as `global_postgres` from `../docker-stack`.
 
 ```bash
 cd ../docker-stack
 docker compose --profile postgres up -d
 ```
 
-Then copy `.env.example` to `.env` and migrate. Connection defaults:
+Copy `.env.example` to `.env`, set `APP_KEY` and `API_SECRET_KEY`, then migrate. Local database defaults:
 
 | Setting | Value |
 | --- | --- |
@@ -26,60 +39,43 @@ Then copy `.env.example` to `.env` and migrate. Connection defaults:
 | Username | `root` |
 | Password | `123` |
 
-`global_php84` needs the `pdo_pgsql` extension. Run migrations from that container when the host PHP build does not have it:
+`global_php84` needs `pdo_pgsql`. When the host PHP build does not have it, migrate from that container:
 
 ```bash
 docker exec -w /var/www/yoru-laravel-backend global_php84 php artisan migrate --no-interaction --force
+docker exec -w /var/www/yoru-laravel-backend global_php84 php artisan db:seed --no-interaction --force
 ```
 
-Request and endpoint details are in [DEVELOPER.md](DEVELOPER.md). Agent and schema rules are in [AGENTS.md](AGENTS.md).
+Seeded roles are `admin` and `user`, both on the `api` guard.
 
-## About Laravel
+## Calling the API
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+Login and register are public. Other routes need `Authorization: Bearer <token>` and `X-API-TOKEN`. Get the second header from `GET /api/v1/auth/api-token` after login.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+```http
+POST /api/v1/auth/login
+Content-Type: application/json
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+{
+    "username": "jane@example.com",
+    "password": "secret123"
+}
+```
 
-## Learning Laravel
+## Tests
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+PHPUnit uses the `testing` database. From the PHP container:
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+```bash
+docker exec -w /var/www/yoru-laravel-backend -e DB_HOST=global_postgres global_php84 php artisan test
+```
 
-## Laravel Sponsors
+Before finishing a change, also run:
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
-
-### Premium Partners
-
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
-
-## Contributing
-
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
-
-## Code of Conduct
-
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```bash
+vendor/bin/pint --test
+vendor/bin/phpstan analyse --error-format=github
+```
 
 ## License
 

@@ -25,9 +25,17 @@ class UserDetail extends Model
         'security_log',
     ];
 
+    /**
+     * @var list<string>
+     */
+    protected $hidden = [
+        'transaction_pin',
+    ];
+
     protected function casts(): array
     {
         return [
+            'transaction_pin' => 'hashed',
             'last_transaction_at' => 'datetime',
             'security_log' => 'array',
         ];

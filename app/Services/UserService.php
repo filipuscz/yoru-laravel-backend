@@ -24,7 +24,7 @@ class UserService extends BaseService
                 $user->syncRoles($data['roles']);
             }
 
-            $details = $data['details'] ?? [];
+            $details = $this->prepareDetails($data['details'] ?? []);
             $user->detail()->create($details);
 
             return $user->load(['roles', 'detail']);
@@ -49,7 +49,7 @@ class UserService extends BaseService
                 if (isset($data['details'])) {
                     $user->detail()->updateOrCreate(
                         ['user_id' => $user->id],
-                        $data['details']
+                        $this->prepareDetails($data['details'])
                     );
                 }
 
@@ -80,5 +80,18 @@ class UserService extends BaseService
     {
         parent::delete($idOrSlug);
         Cache::forget("user_profile_{$idOrSlug}");
+    }
+
+    /**
+     * @param  array<string, mixed>  $details
+     * @return array<string, mixed>
+     */
+    private function prepareDetails(array $details): array
+    {
+        if (array_key_exists('transaction_pin', $details) && ($details['transaction_pin'] === null || $details['transaction_pin'] === '')) {
+            $details['transaction_pin'] = null;
+        }
+
+        return $details;
     }
 }

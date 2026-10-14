@@ -6,6 +6,7 @@ use App\Helpers\ApiTokenHelper;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
@@ -69,6 +70,33 @@ class UserControllerTest extends TestCase
             'email' => 'testuser@example.com',
             'username' => 'testuser',
         ]);
+    }
+
+    public function test_transaction_pin_is_stored_as_a_hash_and_omitted_from_the_response(): void
+    {
+        $response = $this->actingAs($this->adminUser, 'api')
+            ->withHeaders(['X-API-TOKEN' => $this->apiToken])
+            ->postJson('/api/v1/users', [
+                'name' => 'Pin User',
+                'email' => 'pin@example.com',
+                'username' => 'pinuser',
+                'password' => 'secret123',
+                'details' => [
+                    'transaction_pin' => '123456',
+                    'phone_number' => '+628123456789',
+                ],
+            ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data.detail.phone_number', '+628123456789');
+
+        $detail = $response->json('data.detail');
+        $this->assertIsArray($detail);
+        $this->assertArrayNotHasKey('transaction_pin', $detail);
+
+        $storedPin = User::query()->where('email', 'pin@example.com')->firstOrFail()->detail->transaction_pin;
+        $this->assertNotSame('123456', $storedPin);
+        $this->assertTrue(Hash::check('123456', $storedPin));
     }
 
     public function test_created_user_can_log_in_with_the_given_password(): void
