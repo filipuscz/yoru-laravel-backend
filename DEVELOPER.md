@@ -137,6 +137,11 @@ Authorization: Bearer <token>
 ```
 
 **Bulk Update Settings**
+Only keys listed in `config/settings.php` are accepted. An unknown key returns `422` and none of the keys in that request are written.
+
+Allowed keys: `send_welcome_email`, `smtp_host`, `smtp_port`, `smtp_username`, `smtp_password`, `smtp_encryption`, `mail_from_address`, `mail_from_name`.
+
+`smtp_password` is stored for the mailer and omitted from `GET /settings`. That item includes `"secret": true` and no `value`.
 ```http
 PATCH /settings
 Authorization: Bearer <token>
@@ -156,7 +161,40 @@ Content-Type: application/json
 
 ---
 
-## 3. Notifications
+## 3. Row history
+
+PostgreSQL writes a history row on insert, update, and delete for examples, users, user details, posts, settings, roles, and permissions. The API can read every one of those except posts.
+
+The list is paged with `page` and `limit` (`limit` max 100). Each item has `id`, `action` (`created`, `updated`, or `deleted`), `changes`, and `created_at`. `changes` contains only the fields that differed. The list does not include `snapshot`.
+
+**List history for one record**
+`{setting}` may be the numeric id or the setting key, such as `smtp_host`. Role and permission history require an admin.
+```http
+GET /examples/{example}/histories?limit=10&page=1
+GET /users/{user}/histories
+GET /users/{user}/details/histories
+GET /settings/{setting}/histories
+GET /roles/{role}/histories
+GET /permissions/{permission}/histories
+Authorization: Bearer <token>
+```
+
+**One history event**
+`snapshot` is the row as stored at that time. A missing key means that column did not exist yet. `password`, `remember_token`, and `transaction_pin` are never present.
+```http
+GET /examples/{example}/histories/{history}
+Authorization: Bearer <token>
+```
+
+**Purge old history**
+`history:purge` calls the PostgreSQL procedure `pr_purge_history`. It deletes rows older than `--days` from every history table, in batches of `--batch`, and commits each batch. Both values must be at least 1.
+```bash
+php artisan history:purge --days=365 --batch=1000
+```
+
+---
+
+## 4. Notifications
 Manage the authenticated user's database notifications.
 
 **List User's Notifications**
@@ -200,7 +238,7 @@ $user->notify(new \App\Notifications\SystemAlert([
 
 ---
 
-## 4. Users CRUD
+## 5. Users CRUD
 Full management of users, their profile details, and their roles.
 
 **List Users**
@@ -247,7 +285,7 @@ Authorization: Bearer <token>
 
 ---
 
-## 5. Roles & Permissions CRUD
+## 6. Roles & Permissions CRUD
 Role-Based Access Control (RBAC) via Spatie.
 
 **List Roles**
@@ -273,11 +311,10 @@ Content-Type: application/json
 GET /permissions
 Authorization: Bearer <token>
 ```
-```
 
 ---
 
-## 6. Localization (Translations API)
+## 7. Localization (Translations API)
 Expose the backend Laravel localization files (e.g. `messages.php`, `validation.php`) to frontend SPA/Mobile applications.
 
 **Get Translations by Locale**
@@ -288,11 +325,11 @@ GET /languages/{locale}
 
 ---
 
-## 7. MCP Server
+## 8. MCP Server
 
 This template includes an authenticated, remote [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server. It starts intentionally empty: it establishes secure OAuth access but does not expose application data or actions until you add tools.
 
-### 7.1 Configure a deployment
+### 8.1 Configure a deployment
 
 Set these values in `.env` before allowing an MCP client to connect:
 
@@ -316,7 +353,7 @@ php artisan passport:keys --force --no-interaction
 php artisan config:clear --no-interaction
 ```
 
-### 7.2 Start the application and verify the endpoints
+### 8.2 Start the application and verify the endpoints
 
 Run the application using the normal project environment, then replace `https://api.example.com` below with its public URL:
 
@@ -342,7 +379,7 @@ Current clients speak protocol revision `2026-07-28`. They open with `server/dis
 
 Clients that still open with `initialize` and protocol revision `2025-11-25` or `2025-06-18` continue to work. Those legacy requests omit `_meta` and the MCP HTTP headers.
 
-### 7.3 Connect an MCP client
+### 8.3 Connect an MCP client
 
 Add a remote MCP server in a client that supports OAuth 2.1 and dynamic client registration. Use this URL:
 
@@ -356,7 +393,7 @@ Before enabling OAuth, the consuming application must provide session authentica
 
 For local development, use a publicly reachable HTTPS tunnel and add that tunnel's URL to `MCP_AUTHORIZATION_SERVER`. Add only the specific client callback origins or desktop schemes you need. `http://localhost` is accepted only when it is explicitly included in `MCP_REDIRECT_DOMAINS`.
 
-### 7.4 Add the first tool
+### 8.4 Add the first tool
 
 Create a tool and register it with the server:
 
@@ -406,7 +443,7 @@ protected array $tools = [
 
 Do not expose destructive tools by default. Every tool must validate input, perform authorization with `$request->user()`, return only the data required by the request, and delegate reusable data operations to an application service. Add a focused feature test for every tool before connecting it to a production client.
 
-### 7.5 Test and inspect
+### 8.5 Test and inspect
 
 Use the MCP Inspector while developing a server:
 
@@ -422,7 +459,7 @@ php artisan test --filter=McpTest
 
 ---
 
-## 8. Quality Assurance & CI Checks
+## 9. Quality Assurance & CI Checks
 
 To ensure the backend API remains stable, performant, and clean, all developers (and AI agents) must run the following sequence of checks before finalizing any feature or prompt:
 

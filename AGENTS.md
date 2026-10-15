@@ -41,13 +41,17 @@ PostgreSQL writes row history. Do not record it in PHP with model events, observ
 - History rows do not store the acting Laravel user. PostgreSQL cannot see `Auth::id()`.
 - Audited tables: `tb_examples`, `me_users`, `me_user_details`, `tb_posts`, `st_settings`, `st_roles`, `st_permissions`. Leave cache, jobs, sessions, OAuth tokens, password-reset tokens, and notifications unaudited.
 - Put trigger SQL in a migration with `DB::unprepared`. A migration file is in the global namespace; a `use RuntimeException` statement there is a no-op and becomes an error.
-- There is no history Eloquent model. Tests assert rows through the query builder.
-- A history API pages one record id at a time. The list returns `action`, `created_at`, and `changes`. Load `snapshot` for a single event.
+- There is no history Eloquent model. Tests assert rows through the query builder. Reads go through `App\Services\HistoryService`.
+- The read API is `HistoryController`. Sources live in `config/history.php`. List `GET /api/v1/{resource}/{id}/histories` returns `id`, `action`, `changes`, and `created_at`. Show `GET /api/v1/{resource}/{id}/histories/{history}` adds `snapshot`. `page` and `limit` apply (`limit` max 100).
+- Routes: `examples/{example}`, `users/{user}`, `users/{user}/details` (the detail row for that user), `settings/{setting}` (id or key), `roles/{role}`, and `permissions/{permission}`. `tb_posts` is audited and purged, and has no read route.
+- Authorization matches the parent: `view examples`, `view users`, or `view settings`. Roles and permissions require the `admin` role on the `api` guard.
+- Resolve a soft-deleted parent with `withTrashed()` so its history stays readable. Read the history id with `$request->route('history')`. Do not add a `string $history` action argument; Laravel then injects the parent id by position.
+- `password`, `remember_token`, and `transaction_pin` are already absent from stored JSON. Do not add them back in the resource.
 
 ### Functions, procedures, and views
 
 - A trigger runs a function. `CREATE PROCEDURE` cannot be that function. `EXECUTE PROCEDURE` on `CREATE TRIGGER` is the old spelling and still requires a function that returns `trigger`.
-- A procedure (`pr_{purpose}`, invoked with `CALL`) is a maintenance job that commits in batches, such as purging old `*_hist` rows. One shared purge procedure covers every history table. Call it from an Artisan command outside `DB::transaction()`, because a procedure cannot `COMMIT` while Laravel already holds a transaction.
+- A procedure (`pr_{purpose}`, invoked with `CALL`) is a maintenance job that commits in batches. `pr_purge_history` deletes old rows from every table in `config/history.php` `purge_tables`. `php artisan history:purge --days=365 --batch=1000` calls it. Days and batch must be at least 1. Call it outside `DB::transaction()`, because a procedure cannot `COMMIT` while Laravel already holds a transaction. A test that calls it must set `connectionsToTransact` to `[]` so `RefreshDatabase` does not open that transaction.
 - A view is a saved `SELECT` for a stable read shape, such as history list columns or a user joined to user details without secrets. It stores no rows. Writes stay on the base tables so the history triggers run. `CREATE OR REPLACE VIEW` may add columns only at the end.
 
 ## 3. Security & Authentication
@@ -56,6 +60,7 @@ PostgreSQL writes row history. Do not record it in PHP with model events, observ
 - Use Form Request classes for validation rather than inline validation in controllers. Include validation rules and custom error messages if needed.
 - Use Laravel's built-in authentication and authorization features (gates, policies, Sanctum/Passport, etc.).
 - Use queued jobs for time-consuming operations with the `ShouldQueue` interface.
+- **Settings allowlist**: `PATCH /settings` accepts only keys in `config/settings.php`. Reject the whole request when any key is unknown, and write nothing. Secret keys (`smtp_password`) stay stored for the mailer and are omitted from `SettingResource`. Add a new key to that config, not only to `RoleSeeder`.
 
 ## 4. Code Style & PHP Rules
 
@@ -86,6 +91,7 @@ PostgreSQL writes row history. Do not record it in PHP with model events, observ
 - Run the app/dev stack: `composer run dev`
 - Build frontend assets when needed: `npm run build`
 - Pass `--no-interaction` to all Artisan commands to ensure they work without user input.
+- Purge history: `php artisan history:purge --days=365 --batch=1000`
 
 ## 7. Laravel Boost & Ecosystem
 
