@@ -109,5 +109,7 @@ class AppServiceProvider extends ServiceProvider
         foreach (['user', 'example', 'role', 'permission', 'notification'] as $parameter) {
             Route::pattern($parameter, '[0-9]+|[a-z0-9-]+');
         }
+        Route::pattern('history', '[0-9]+');
+        Route::pattern('setting', '[0-9]+|[a-z0-9_]+');
     }
 }

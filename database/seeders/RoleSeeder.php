@@ -39,19 +39,11 @@ class RoleSeeder extends Seeder
             ]);
         }
 
-        // Seed initial SMTP settings
-        $settings = [
-            'send_welcome_email' => '1',
-            'smtp_host' => '127.0.0.1',
-            'smtp_port' => '2525',
-            'smtp_username' => '',
-            'smtp_password' => '',
-            'smtp_encryption' => 'tls',
-            'mail_from_address' => 'hello@example.com',
-            'mail_from_name' => 'Laravel',
-        ];
-        foreach ($settings as $key => $value) {
-            Setting::updateOrCreate(['key' => $key], ['value' => $value]);
+        foreach (config('settings.allowed', []) as $key => $meta) {
+            Setting::updateOrCreate(
+                ['key' => $key],
+                ['value' => is_array($meta) ? ($meta['default'] ?? '') : ''],
+            );
         }
 
         $apiPermissions = Permission::query()->where('guard_name', 'api')->get();

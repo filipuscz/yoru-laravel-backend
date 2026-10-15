@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Setting;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Validation\ValidationException;
 
 class SettingService extends BaseService
 {
@@ -37,6 +38,8 @@ class SettingService extends BaseService
      */
     public function set(string $key, mixed $value, string $type = 'string'): void
     {
+        $this->assertAllowed($key);
+
         $this->model->updateOrCreate(
             ['key' => $key],
             ['value' => $value, 'type' => $type]
@@ -49,6 +52,10 @@ class SettingService extends BaseService
      */
     public function setMany(array $settings): void
     {
+        foreach (array_keys($settings) as $key) {
+            $this->assertAllowed((string) $key);
+        }
+
         foreach ($settings as $key => $value) {
             $this->model->updateOrCreate(
                 ['key' => $key],
@@ -56,5 +63,14 @@ class SettingService extends BaseService
             );
         }
         Cache::forget('global_settings');
+    }
+
+    private function assertAllowed(string $key): void
+    {
+        if (! array_key_exists($key, config('settings.allowed', []))) {
+            throw ValidationException::withMessages([
+                'settings.'.$key => __('validation.in', ['attribute' => 'settings.'.$key]),
+            ]);
+        }
     }
 }

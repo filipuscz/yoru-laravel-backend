@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\v1\AuthController;
 use App\Http\Controllers\Api\v1\ExampleController;
+use App\Http\Controllers\Api\v1\HistoryController;
 use App\Http\Controllers\Api\v1\LanguageController;
 use App\Http\Controllers\Api\v1\NotificationController;
 use App\Http\Controllers\Api\v1\PermissionController;
@@ -19,6 +20,8 @@ Route::prefix('v1')
         Route::middleware('auth:api')->group(function () {
             Route::get('settings', [SettingController::class, 'index'])->name('settings.index');
             Route::patch('settings', [SettingController::class, 'bulkUpdate'])->name('settings.update');
+            Route::get('settings/{setting}/histories', [HistoryController::class, 'index'])->defaults('historySource', 'settings')->name('settings.histories.index');
+            Route::get('settings/{setting}/histories/{history}', [HistoryController::class, 'show'])->defaults('historySource', 'settings')->name('settings.histories.show');
 
             Route::post('notifications/read', [NotificationController::class, 'markAllAsRead'])->name('notifications.read');
             Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
@@ -27,19 +30,29 @@ Route::prefix('v1')
 
             Route::post('users/bulk-update', [UserController::class, 'bulkUpdate'])->name('users.bulk-update');
             Route::post('users/bulk-delete', [UserController::class, 'bulkDestroy'])->name('users.bulk-delete');
+            Route::get('users/{user}/details/histories', [HistoryController::class, 'index'])->defaults('historySource', 'user_details')->name('users.details.histories.index');
+            Route::get('users/{user}/details/histories/{history}', [HistoryController::class, 'show'])->defaults('historySource', 'user_details')->name('users.details.histories.show');
+            Route::get('users/{user}/histories', [HistoryController::class, 'index'])->defaults('historySource', 'users')->name('users.histories.index');
+            Route::get('users/{user}/histories/{history}', [HistoryController::class, 'show'])->defaults('historySource', 'users')->name('users.histories.show');
             Route::apiResource('users', UserController::class);
 
             Route::post('examples/bulk-update', [ExampleController::class, 'bulkUpdate'])->name('examples.bulk-update');
             Route::post('examples/bulk-delete', [ExampleController::class, 'bulkDestroy'])->name('examples.bulk-delete');
+            Route::get('examples/{example}/histories', [HistoryController::class, 'index'])->defaults('historySource', 'examples')->name('examples.histories.index');
+            Route::get('examples/{example}/histories/{history}', [HistoryController::class, 'show'])->defaults('historySource', 'examples')->name('examples.histories.show');
             Route::apiResource('examples', ExampleController::class);
 
             Route::middleware(RoleMiddleware::using('admin', 'api'))->group(function () {
                 Route::post('roles/bulk-update', [RoleController::class, 'bulkUpdate'])->name('roles.bulk-update');
                 Route::post('roles/bulk-delete', [RoleController::class, 'bulkDestroy'])->name('roles.bulk-delete');
+                Route::get('roles/{role}/histories', [HistoryController::class, 'index'])->defaults('historySource', 'roles')->name('roles.histories.index');
+                Route::get('roles/{role}/histories/{history}', [HistoryController::class, 'show'])->defaults('historySource', 'roles')->name('roles.histories.show');
                 Route::apiResource('roles', RoleController::class);
 
                 Route::post('permissions/bulk-update', [PermissionController::class, 'bulkUpdate'])->name('permissions.bulk-update');
                 Route::post('permissions/bulk-delete', [PermissionController::class, 'bulkDestroy'])->name('permissions.bulk-delete');
+                Route::get('permissions/{permission}/histories', [HistoryController::class, 'index'])->defaults('historySource', 'permissions')->name('permissions.histories.index');
+                Route::get('permissions/{permission}/histories/{history}', [HistoryController::class, 'show'])->defaults('historySource', 'permissions')->name('permissions.histories.show');
                 Route::apiResource('permissions', PermissionController::class);
             });
         });
