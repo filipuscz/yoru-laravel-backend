@@ -28,6 +28,28 @@ This document serves as the master guidelines file for AI Agents operating in th
 - When modifying a column, the migration must include all attributes previously defined on the column. Otherwise, they will be dropped.
 - Casts should be set in a `casts()` method on a model rather than the `$casts` property.
 
+### Row history
+
+PostgreSQL writes row history. Do not record it in PHP with model events, observers, or services.
+
+- Each audited table has its own history table, trigger function (`RETURNS trigger`), and `AFTER INSERT OR UPDATE OR DELETE` trigger. A trigger attaches to one table.
+- Names follow the source table. `tb_examples` uses history table `tb_example_hist`, record column `example_id`, function `fn_tb_example_hist`, and trigger `trg_tb_examples_hist`. Keep the source prefix (`me_`, `tb_`, `st_`, `mg_`).
+- History columns are `id`, the record id (`unsignedBigInteger`, indexed, no foreign key), `action` (`created`, `updated`, or `deleted`), `snapshot` (`jsonb`), `changes` (`jsonb`, nullable), and timestamps. The missing foreign key lets a hard delete insert its history row.
+- `INSERT` stores `created` and `to_jsonb(NEW)`. An `UPDATE` that sets `deleted_at` from null stores `deleted`. Any other `UPDATE` stores `updated` and `changes` for keys whose values differ. `DELETE` stores `deleted` and `to_jsonb(OLD)`.
+- `to_jsonb(NEW)` includes columns added later. Leave the trigger unchanged when a column is added. Older history rows omit that key. A missing key means the column did not exist yet. A JSON `null` means the column existed and the value was null.
+- Remove `password`, `remember_token`, and `transaction_pin` from `snapshot` and `changes`.
+- History rows do not store the acting Laravel user. PostgreSQL cannot see `Auth::id()`.
+- Audited tables: `tb_examples`, `me_users`, `me_user_details`, `tb_posts`, `st_settings`, `st_roles`, `st_permissions`. Leave cache, jobs, sessions, OAuth tokens, password-reset tokens, and notifications unaudited.
+- Put trigger SQL in a migration with `DB::unprepared`. A migration file is in the global namespace; a `use RuntimeException` statement there is a no-op and becomes an error.
+- There is no history Eloquent model. Tests assert rows through the query builder.
+- A history API pages one record id at a time. The list returns `action`, `created_at`, and `changes`. Load `snapshot` for a single event.
+
+### Functions, procedures, and views
+
+- A trigger runs a function. `CREATE PROCEDURE` cannot be that function. `EXECUTE PROCEDURE` on `CREATE TRIGGER` is the old spelling and still requires a function that returns `trigger`.
+- A procedure (`pr_{purpose}`, invoked with `CALL`) is a maintenance job that commits in batches, such as purging old `*_hist` rows. One shared purge procedure covers every history table. Call it from an Artisan command outside `DB::transaction()`, because a procedure cannot `COMMIT` while Laravel already holds a transaction.
+- A view is a saved `SELECT` for a stable read shape, such as history list columns or a user joined to user details without secrets. It stores no rows. Writes stay on the base tables so the history triggers run. `CREATE OR REPLACE VIEW` may add columns only at the end.
+
 ## 3. Security & Authentication
 
 - **User Enumeration**: Do NOT implement custom validation rules (like `UserExists`) that explicitly reveal whether a user exists during authentication. Rely on `Auth::attempt` to fail cleanly and return a generic `auth.failed` message.
