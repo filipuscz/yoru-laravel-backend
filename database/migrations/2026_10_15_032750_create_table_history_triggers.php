@@ -68,15 +68,6 @@ return new class extends Migration
                 'hidden' => ['transaction_pin'],
             ],
             [
-                'source' => 'tb_posts',
-                'history' => 'tb_post_hist',
-                'record' => 'post_id',
-                'function' => 'fn_tb_post_hist',
-                'trigger' => 'trg_tb_posts_hist',
-                'soft_deletes' => true,
-                'hidden' => [],
-            ],
-            [
                 'source' => 'st_settings',
                 'history' => 'st_setting_hist',
                 'record' => 'setting_id',

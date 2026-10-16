@@ -163,7 +163,7 @@ Content-Type: application/json
 
 ## 3. Row history
 
-PostgreSQL writes a history row on insert, update, and delete for examples, users, user details, posts, settings, roles, and permissions. The API can read every one of those except posts.
+PostgreSQL writes a history row on insert, update, and delete for examples, users, user details, settings, roles, and permissions.
 
 The list is paged with `page` and `limit` (`limit` max 100). Each item has `id`, `action` (`created`, `updated`, or `deleted`), `changes`, and `created_at`. `changes` contains only the fields that differed. The list does not include `snapshot`.
 

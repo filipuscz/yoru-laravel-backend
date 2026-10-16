@@ -39,11 +39,11 @@ PostgreSQL writes row history. Do not record it in PHP with model events, observ
 - `to_jsonb(NEW)` includes columns added later. Leave the trigger unchanged when a column is added. Older history rows omit that key. A missing key means the column did not exist yet. A JSON `null` means the column existed and the value was null.
 - Remove `password`, `remember_token`, and `transaction_pin` from `snapshot` and `changes`.
 - History rows do not store the acting Laravel user. PostgreSQL cannot see `Auth::id()`.
-- Audited tables: `tb_examples`, `me_users`, `me_user_details`, `tb_posts`, `st_settings`, `st_roles`, `st_permissions`. Leave cache, jobs, sessions, OAuth tokens, password-reset tokens, and notifications unaudited.
+- Audited tables: `tb_examples`, `me_users`, `me_user_details`, `st_settings`, `st_roles`, `st_permissions`. Leave cache, jobs, sessions, OAuth tokens, password-reset tokens, and notifications unaudited.
 - Put trigger SQL in a migration with `DB::unprepared`. A migration file is in the global namespace; a `use RuntimeException` statement there is a no-op and becomes an error.
 - There is no history Eloquent model. Tests assert rows through the query builder. Reads go through `App\Services\HistoryService`.
 - The read API is `HistoryController`. Sources live in `config/history.php`. List `GET /api/v1/{resource}/{id}/histories` returns `id`, `action`, `changes`, and `created_at`. Show `GET /api/v1/{resource}/{id}/histories/{history}` adds `snapshot`. `page` and `limit` apply (`limit` max 100).
-- Routes: `examples/{example}`, `users/{user}`, `users/{user}/details` (the detail row for that user), `settings/{setting}` (id or key), `roles/{role}`, and `permissions/{permission}`. `tb_posts` is audited and purged, and has no read route.
+- Routes: `examples/{example}`, `users/{user}`, `users/{user}/details` (the detail row for that user), `settings/{setting}` (id or key), `roles/{role}`, and `permissions/{permission}`.
 - Authorization matches the parent: `view examples`, `view users`, or `view settings`. Roles and permissions require the `admin` role on the `api` guard.
 - Resolve a soft-deleted parent with `withTrashed()` so its history stays readable. Read the history id with `$request->route('history')`. Do not add a `string $history` action argument; Laravel then injects the parent id by position.
 - `password`, `remember_token`, and `transaction_pin` are already absent from stored JSON. Do not add them back in the resource.

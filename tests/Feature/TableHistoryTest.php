@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Models\Post;
 use App\Models\Setting;
 use App\Models\User;
 use App\Models\UserDetail;
@@ -65,30 +64,6 @@ class TableHistoryTest extends TestCase
             'user_detail_id' => $detail->getKey(),
             'action' => 'deleted',
         ]);
-    }
-
-    public function test_post_history_records_create_update_and_soft_delete(): void
-    {
-        $post = Post::factory()->create();
-
-        $this->assertDatabaseHas('tb_post_hist', [
-            'post_id' => $post->getKey(),
-            'action' => 'created',
-        ]);
-
-        $post->update(['title' => 'Changed title']);
-
-        $updated = $this->historyRow('tb_post_hist', 'post_id', $post->getKey(), 'updated');
-        $this->assertSame('Changed title', $this->snapshot($updated)['title']);
-        $this->assertSame('Changed title', $this->changes($updated)['title']);
-
-        $post->delete();
-
-        $this->assertDatabaseHas('tb_post_hist', [
-            'post_id' => $post->getKey(),
-            'action' => 'deleted',
-        ]);
-        $this->assertSame(3, DB::table('tb_post_hist')->where('post_id', $post->getKey())->count());
     }
 
     public function test_setting_history_records_create_update_and_delete(): void

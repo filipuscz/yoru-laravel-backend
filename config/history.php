@@ -7,8 +7,7 @@ return [
     | History purge
     |--------------------------------------------------------------------------
     |
-    | Tables passed to pr_purge_history. Posts are included here even though
-    | they have no read API yet.
+    | Tables passed to pr_purge_history.
     |
     */
 
@@ -16,7 +15,6 @@ return [
         'tb_example_hist',
         'me_user_hist',
         'me_user_detail_hist',
-        'tb_post_hist',
         'st_setting_hist',
         'st_role_hist',
         'st_permission_hist',
