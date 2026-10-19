@@ -4,6 +4,7 @@ namespace App\Http\Requests\User;
 
 use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Spatie\Permission\Models\Role;
 
@@ -12,11 +13,24 @@ class StoreUpdateRequest extends FormRequest
     public function authorize(): bool
     {
         $userId = $this->route('user') ?? $this->route('idOrSlug');
-        if ($userId) {
-            return $this->user() && $this->user()->can('update users');
+        $user = $this->user();
+        $canManageUser = $userId
+            ? $user?->can('update users')
+            : $user?->can('create users');
+
+        if (! $canManageUser || ! $this->has('roles')) {
+            return (bool) $canManageUser;
         }
 
-        return $this->user() && $this->user()->can('create users');
+        $roles = $this->input('roles');
+        if (! is_array($roles)) {
+            return true;
+        }
+
+        $target = $userId ? User::withTrashed()->find($userId) : null;
+        $roleNames = array_values(array_filter($roles, fn (mixed $role): bool => is_string($role)));
+
+        return Gate::forUser($user)->allows('assignRoles', [User::class, $target, $roleNames]);
     }
 
     public function rules(): array
@@ -35,7 +49,7 @@ class StoreUpdateRequest extends FormRequest
             ],
             'is_active' => 'sometimes|boolean',
             'roles' => 'nullable|array',
-            'roles.*' => Rule::exists(Role::class, 'name'), // Accepts role names
+            'roles.*' => Rule::exists(Role::class, 'name')->where('guard_name', 'api'),
 
             // Nested UserDetail Rules
             'details' => 'nullable|array',

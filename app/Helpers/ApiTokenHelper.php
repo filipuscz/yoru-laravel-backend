@@ -5,6 +5,7 @@ namespace App\Helpers;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Crypt;
 use RuntimeException;
+use Throwable;
 
 class ApiTokenHelper
 {
@@ -24,20 +25,39 @@ class ApiTokenHelper
 
     public static function validation(string $header): bool
     {
+        $secret = self::secret();
         $expiryHours = self::expireHours();
-        $decoded = base64_decode($header);
-        [$encrypted, $signature] = explode('.', $decoded);
 
-        $expectedSignature = hash_hmac('sha256', $encrypted, self::secret());
-        throw_if(! hash_equals($expectedSignature, $signature), new \Exception(__('exceptions.invalid_api_token_signature')));
+        try {
+            $decoded = base64_decode($header, true);
+            if (! is_string($decoded)) {
+                return false;
+            }
 
-        $decrypted = Crypt::decryptString($encrypted);
-        [$timestamp, $random] = explode('|', $decrypted);
-        $tokenDate = Carbon::createFromFormat('YmdHis', $timestamp);
-        $expiryTime = $tokenDate->clone()->addHours($expiryHours);
-        throw_if(now()->greaterThan($expiryTime), new \Exception(__('exceptions.api_token_expired')));
+            $signedParts = explode('.', $decoded, 2);
+            if (count($signedParts) !== 2 || $signedParts[0] === '' || $signedParts[1] === '') {
+                return false;
+            }
 
-        return true;
+            [$encrypted, $signature] = $signedParts;
+            $expectedSignature = hash_hmac('sha256', $encrypted, $secret);
+            if (! hash_equals($expectedSignature, $signature)) {
+                return false;
+            }
+
+            $payloadParts = explode('|', Crypt::decryptString($encrypted), 2);
+            if (count($payloadParts) !== 2
+                || ! preg_match('/^\d{14}$/', $payloadParts[0])
+                || ! preg_match('/^[a-f0-9]{16}$/', $payloadParts[1])) {
+                return false;
+            }
+
+            $tokenDate = Carbon::createFromFormat('YmdHis', $payloadParts[0]);
+
+            return ! now()->greaterThan($tokenDate->clone()->addHours($expiryHours));
+        } catch (Throwable) {
+            return false;
+        }
     }
 
     private static function secret(): string

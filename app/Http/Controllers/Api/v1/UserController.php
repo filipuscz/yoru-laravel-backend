@@ -11,9 +11,7 @@ use App\Http\Requests\User\ShowRequest;
 use App\Http\Requests\User\StoreUpdateRequest;
 use App\Http\Resources\UserResource;
 use App\Services\UserService;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class UserController extends BaseApiController
@@ -22,29 +20,12 @@ class UserController extends BaseApiController
 
     public function index(IndexRequest $request): JsonResponse
     {
-        $indexes = $this->prepareIndexes($request->all());
-        $results = $this->userService->findByIndexes(
-            $indexes['indexes'],
-            $indexes['any'],
-            $indexes['limit'],
-            $indexes['orderBy'],
-            $indexes['qcomparator'],
-            $indexes['filters']
+        return $this->respondWithIndex(
+            $request,
+            $this->userService,
+            UserResource::class,
+            ['roles', 'detail'],
         );
-
-        if ($results instanceof LengthAwarePaginator) {
-            /** @var Collection $collection */
-            $collection = $results->getCollection();
-            $collection->load(['roles', 'detail']);
-        } else {
-            /** @var Collection $results */
-            $results->load(['roles', 'detail']);
-        }
-
-        $formattedResponse = $this->paginateResponse($results, UserResource::class);
-
-        return $this->setStatusMsg($formattedResponse['meta']['total'] ? 'success' : 'failed')
-            ->respondOK($formattedResponse, $formattedResponse['meta']['total'] ? __('messages.data_found') : __('messages.data_not_found'));
     }
 
     public function store(StoreUpdateRequest $request): JsonResponse

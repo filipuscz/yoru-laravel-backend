@@ -9,6 +9,12 @@ use Illuminate\Support\Facades\DB;
 
 class UserService extends BaseService
 {
+    protected array $searchableColumns = [
+        'name',
+        'email',
+        'username',
+    ];
+
     public function __construct(User $user)
     {
         parent::__construct($user);

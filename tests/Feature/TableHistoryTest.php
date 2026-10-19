@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\UserDetail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -14,6 +15,16 @@ use Tests\TestCase;
 class TableHistoryTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_history_tables_index_created_at_for_retention_purges(): void
+    {
+        foreach (config('history.purge_tables') as $table) {
+            $this->assertTrue(
+                Schema::hasIndex($table, ['created_at']),
+                "{$table} must index created_at.",
+            );
+        }
+    }
 
     public function test_user_history_omits_secrets_and_records_soft_delete(): void
     {

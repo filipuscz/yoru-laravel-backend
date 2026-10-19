@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\QueryAcceptedComparatorEnum;
+use App\Services\Concerns\UsesVersionedCache;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -13,19 +14,21 @@ use Spatie\Permission\Models\Role;
 
 class RoleService extends BaseService
 {
+    use UsesVersionedCache;
+
+    protected array $searchableColumns = [
+        'name',
+        'guard_name',
+    ];
+
     public function __construct(Role $role)
     {
         parent::__construct($role);
     }
 
-    protected function getCacheVersion(): string
+    protected function cacheVersionKey(): string
     {
-        return (string) Cache::rememberForever('roles_cache_version', fn () => time());
-    }
-
-    protected function incrementCacheVersion(): void
-    {
-        Cache::put('roles_cache_version', time());
+        return 'roles_cache_version';
     }
 
     public function findByIndexes(

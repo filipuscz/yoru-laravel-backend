@@ -14,6 +14,10 @@ use Dedoc\Scramble\Support\Generator\SecurityRequirement;
 use Dedoc\Scramble\Support\Generator\SecurityScheme;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Queue\Events\JobFailed;
+use Illuminate\Queue\Events\QueueBusy;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -43,6 +47,24 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Event::listen(function (QueueBusy $event): void {
+            Log::warning('Queue is busy.', [
+                'connection' => $event->connectionName,
+                'queue' => $event->queue,
+                'size' => $event->size,
+            ]);
+        });
+        Event::listen(function (JobFailed $event): void {
+            Log::error('Queued job failed.', [
+                'connection' => $event->connectionName,
+                'queue' => $event->job->getQueue(),
+                'job' => $event->job->resolveName(),
+                'job_id' => $event->job->getJobId(),
+                'exception' => $event->exception::class,
+                'message' => $event->exception->getMessage(),
+            ]);
+        });
+
         RateLimiter::for('api', function (Request $request) {
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
         });

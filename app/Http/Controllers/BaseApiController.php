@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Enums\QueryAcceptedComparatorEnum;
+use App\Http\Requests\BaseIndexRequest;
+use App\Services\BaseService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -151,6 +154,41 @@ class BaseApiController extends Controller
     }
 
     /**
+     * @param  class-string<JsonResource>  $resource
+     * @param  list<string>  $relations
+     */
+    protected function respondWithIndex(
+        BaseIndexRequest $request,
+        BaseService $service,
+        string $resource,
+        array $relations = [],
+    ): JsonResponse {
+        $prepared = $this->prepareIndexes($request->all());
+        $results = $service->findByIndexes(
+            $prepared['indexes'],
+            $prepared['any'],
+            $prepared['limit'],
+            $prepared['orderBy'],
+            $prepared['qcomparator'],
+            $prepared['filters'],
+            relation: $relations,
+        );
+
+        if ($results instanceof Builder) {
+            $results = $results->get();
+        }
+
+        $response = $this->paginateResponse($results, $resource);
+        $hasResults = match (true) {
+            $results instanceof LengthAwarePaginator => $results->total() > 0,
+            default => $results->count() > 0,
+        };
+
+        return $this->setStatusMsg($hasResults ? 'success' : 'failed')
+            ->respondOK($response, $hasResults ? __('messages.data_found') : __('messages.data_not_found'));
+    }
+
+    /**
      * Paginate the response data.
      *
      * @param  LengthAwarePaginator|Collection  $paginatedData  The paginated data.
@@ -160,14 +198,8 @@ class BaseApiController extends Controller
     public function paginateResponse(LengthAwarePaginator|CursorPaginator|Collection $paginatedData, mixed $resource = null): array
     {
         if ($paginatedData instanceof LengthAwarePaginator) {
-            if (is_subclass_of($resource, JsonResource::class)) {
-                $items = $resource::collection($paginatedData->items());
-            } else {
-                $items = $paginatedData->items();
-            }
-
             return [
-                'data' => $items,
+                'data' => $this->transformItems($paginatedData->items(), $resource),
                 'meta' => [
                     'total' => $paginatedData->total(),
                     'per_page' => $paginatedData->perPage(),
@@ -185,14 +217,8 @@ class BaseApiController extends Controller
         }
 
         if ($paginatedData instanceof CursorPaginator) {
-            if (is_subclass_of($resource, JsonResource::class)) {
-                $items = $resource::collection($paginatedData->items());
-            } else {
-                $items = $paginatedData->items();
-            }
-
             return [
-                'data' => $items,
+                'data' => $this->transformItems($paginatedData->items(), $resource),
                 'meta' => [
                     'per_page' => $paginatedData->perPage(),
                     'has_more_pages' => $paginatedData->hasMorePages(),
@@ -207,15 +233,8 @@ class BaseApiController extends Controller
             ];
         }
 
-        // Case when the data is not paginated / limit is -1
-        if (is_subclass_of($resource, JsonResource::class)) {
-            $items = $resource::collection($paginatedData->all());
-        } else {
-            $items = $paginatedData->all();
-        }
-
         return [
-            'data' => $items,
+            'data' => $this->transformItems($paginatedData->all(), $resource),
             'meta' => [
                 'total' => $paginatedData->count(),
                 'limit' => $paginatedData->count(),
@@ -229,6 +248,18 @@ class BaseApiController extends Controller
                 'next' => null,
             ],
         ];
+    }
+
+    /**
+     * @param  array<mixed>  $items
+     */
+    private function transformItems(array $items, mixed $resource): mixed
+    {
+        if (is_string($resource) && is_subclass_of($resource, JsonResource::class)) {
+            return $resource::collection($items);
+        }
+
+        return $items;
     }
 
     public function formatErrors(array $errors): array

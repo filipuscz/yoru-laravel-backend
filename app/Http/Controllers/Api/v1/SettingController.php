@@ -15,20 +15,7 @@ class SettingController extends BaseApiController
 
     public function index(IndexRequest $request): JsonResponse
     {
-        $indexes = $this->prepareIndexes($request->all());
-        $results = $this->settingService->findByIndexes(
-            $indexes['indexes'],
-            $indexes['any'],
-            $indexes['limit'],
-            $indexes['orderBy'],
-            $indexes['qcomparator'],
-            $indexes['filters']
-        );
-
-        $formattedResponse = $this->paginateResponse($results, SettingResource::class);
-
-        return $this->setStatusMsg($formattedResponse['meta']['total'] ? 'success' : 'failed')
-            ->respondOK($formattedResponse, $formattedResponse['meta']['total'] ? __('messages.data_found') : __('messages.data_not_found'));
+        return $this->respondWithIndex($request, $this->settingService, SettingResource::class);
     }
 
     public function bulkUpdate(BulkUpdateRequest $request): JsonResponse

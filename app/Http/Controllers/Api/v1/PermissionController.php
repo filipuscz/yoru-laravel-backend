@@ -18,20 +18,7 @@ class PermissionController extends BaseApiController
 
     public function index(BaseIndexRequest $request): JsonResponse
     {
-        $indexes = $this->prepareIndexes($request->all());
-        $results = $this->permissionService->findByIndexes(
-            $indexes['indexes'],
-            $indexes['any'],
-            $indexes['limit'],
-            $indexes['orderBy'],
-            $indexes['qcomparator'],
-            $indexes['filters']
-        );
-
-        $formattedResponse = $this->paginateResponse($results, PermissionResource::class);
-
-        return $this->setStatusMsg($formattedResponse['meta']['total'] ? 'success' : 'failed')
-            ->respondOK($formattedResponse, $formattedResponse['meta']['total'] ? __('messages.data_found') : __('messages.data_not_found'));
+        return $this->respondWithIndex($request, $this->permissionService, PermissionResource::class);
     }
 
     public function store(StoreUpdateRequest $request): JsonResponse

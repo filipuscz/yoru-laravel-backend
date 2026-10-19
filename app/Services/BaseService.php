@@ -12,8 +12,6 @@ use Illuminate\Pagination\CursorPaginator;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Kreait\Firebase\Messaging\CloudMessage;
-use Kreait\Firebase\Messaging\Notification;
 
 /**
  * Class BaseService
@@ -22,19 +20,19 @@ use Kreait\Firebase\Messaging\Notification;
  */
 class BaseService implements IBaseService
 {
-    /** @var Model The model associated with this service. */
     protected Model $model;
 
     protected string $moduleName = 'base';
 
-    /** @var int Size of queued import rows */
     protected int $chunkSize = 1000;
 
-    /** @var array The columns that can be exported. */
+    /** @var list<string> */
+    protected array $searchableColumns = [];
+
     protected $printableColumns = [];
 
-    /** @var array|null The cached columns of the table. */
-    protected ?array $tableColumns = null;
+    /** @var array<string, list<string>> */
+    protected static array $tableColumnCache = [];
 
     /**
      * Constructor.
@@ -53,11 +51,12 @@ class BaseService implements IBaseService
      */
     protected function getTableColumns(): array
     {
-        if ($this->tableColumns === null) {
-            $this->tableColumns = $this->model->getConnection()->getSchemaBuilder()->getColumnListing($this->model->getTable());
-        }
+        $connection = $this->model->getConnection();
+        $cacheKey = $connection->getName().'.'.$this->model->getTable();
 
-        return $this->tableColumns;
+        return self::$tableColumnCache[$cacheKey] ??= $connection
+            ->getSchemaBuilder()
+            ->getColumnListing($this->model->getTable());
     }
 
     /**
@@ -222,11 +221,8 @@ class BaseService implements IBaseService
         ?array $relation = null,
         ?array $defaultOrderBy = null,
     ): Collection|LengthAwarePaginator|CursorPaginator|Builder {
-        // dd($this->model);
-        // Get column names of the model's table
         $columns = $this->getTableColumns();
         $query = $this->model->newQuery();
-        // dd($any, $indexes, $limit, $orderBy, $comparator, $relation);
 
         // Apply filters if provided
         if (! empty($filters)) {
@@ -277,20 +273,16 @@ class BaseService implements IBaseService
                 });
             }
         });
-        $query->when(isset($indexes['search']), function ($query) use ($indexes, $fields, $columns) {
-            if (empty($fields)) {
-                $fields = array_filter($columns, function ($column) {
-                    return ! in_array($column, ['created_at', 'updated_at']);
-                });
-            }
-            $query->where(function ($query) use ($indexes, $fields, $columns) {
-                foreach ($fields as $target) {
-                    if (in_array($target, $columns)) {
-                        $this->wherePattern($query, $target, '%'.$indexes['search'].'%', true);
-                    }
+        $search = trim((string) ($indexes['search'] ?? ''));
+        $searchColumns = array_values(array_intersect($fields ?? $this->searchableColumns, $columns));
+
+        if ($search !== '' && $searchColumns !== []) {
+            $query->where(function (Builder $query) use ($search, $searchColumns): void {
+                foreach ($searchColumns as $column) {
+                    $this->wherePattern($query, $column, '%'.$search.'%', true);
                 }
             });
-        });
+        }
         // Ignore specific records if requested
         $query->when(isset($indexes['ignore']), function ($query) use ($indexes) {
             $query->whereNotIn('id', $indexes['ignore']);
@@ -475,25 +467,5 @@ class BaseService implements IBaseService
 
             return $updatedCount;
         });
-    }
-
-    public function firebaseNotification(array $deviceTokens, string $title, string $body, array $data = [], ?string $imageUrl = null): void
-    {
-        try {
-            $messaging = app('firebase.messaging');
-
-            $notification = Notification::create($title, $body, $imageUrl);
-            foreach ($deviceTokens as $token) {
-
-                $message = CloudMessage::new()
-                    ->withNotification($notification)
-                    ->withData($data)
-                    ->toToken($token);
-
-                $messaging->send($message);
-            }
-        } catch (\Exception $e) {
-            Log::error('Failed to send Firebase notification: '.$e->getMessage());
-        }
     }
 }

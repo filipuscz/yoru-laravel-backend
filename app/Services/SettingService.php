@@ -8,6 +8,12 @@ use Illuminate\Validation\ValidationException;
 
 class SettingService extends BaseService
 {
+    protected array $searchableColumns = [
+        'key',
+        'value',
+        'type',
+    ];
+
     public function __construct(Setting $setting)
     {
         parent::__construct($setting);

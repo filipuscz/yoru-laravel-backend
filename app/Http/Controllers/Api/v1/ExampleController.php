@@ -26,20 +26,7 @@ class ExampleController extends BaseApiController
      */
     public function index(IndexRequest $request): JsonResponse
     {
-        // getPrintableColumns
-        $indexes = $this->prepareIndexes($request->all());
-        $results = $this->exampleService->findByIndexes(
-            $indexes['indexes'],
-            $indexes['any'],
-            $indexes['limit'],
-            $indexes['orderBy'],
-            $indexes['qcomparator'],
-            $indexes['filters']
-        );
-        $formattedResponse = $this->paginateResponse($results, ExampleResource::class);
-
-        return $this->setStatusMsg($formattedResponse['meta']['total'] ? 'success' : 'failed')
-            ->respondOK($formattedResponse, $formattedResponse['meta']['total'] ? __('messages.data_found') : __('messages.data_not_found'));
+        return $this->respondWithIndex($request, $this->exampleService, ExampleResource::class);
     }
 
     /**

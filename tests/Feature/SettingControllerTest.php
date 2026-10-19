@@ -7,6 +7,7 @@ use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
@@ -108,5 +109,36 @@ class SettingControllerTest extends TestCase
             'key' => 'mail_from_name',
             'value' => 'Yoru',
         ]);
+    }
+
+    public function test_smtp_password_never_appears_in_stored_or_returned_history(): void
+    {
+        $setting = Setting::query()->create([
+            'key' => 'smtp_password',
+            'value' => 'first-secret',
+            'type' => 'string',
+        ]);
+        $setting->update(['value' => 'second-secret']);
+
+        $historyRows = DB::table('st_setting_hist')
+            ->where('setting_id', $setting->getKey())
+            ->orderBy('id')
+            ->get();
+
+        $this->assertCount(2, $historyRows);
+        foreach ($historyRows as $historyRow) {
+            $this->assertStringNotContainsString('first-secret', (string) $historyRow->snapshot);
+            $this->assertStringNotContainsString('second-secret', (string) $historyRow->snapshot);
+            $this->assertStringNotContainsString('first-secret', (string) $historyRow->changes);
+            $this->assertStringNotContainsString('second-secret', (string) $historyRow->changes);
+        }
+
+        $response = $this->actingAs($this->adminUser, 'api')
+            ->withHeaders(['X-API-TOKEN' => $this->apiToken])
+            ->getJson('/api/v1/settings/smtp_password/histories');
+
+        $response->assertOk()
+            ->assertDontSee('first-secret')
+            ->assertDontSee('second-secret');
     }
 }

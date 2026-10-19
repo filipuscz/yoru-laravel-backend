@@ -9,9 +9,7 @@ use App\Http\Requests\BaseIndexRequest;
 use App\Http\Requests\Role\StoreUpdateRequest;
 use App\Http\Resources\RoleResource;
 use App\Services\RoleService;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class RoleController extends BaseApiController
@@ -20,29 +18,12 @@ class RoleController extends BaseApiController
 
     public function index(BaseIndexRequest $request): JsonResponse
     {
-        $indexes = $this->prepareIndexes($request->all());
-        $results = $this->roleService->findByIndexes(
-            $indexes['indexes'],
-            $indexes['any'],
-            $indexes['limit'],
-            $indexes['orderBy'],
-            $indexes['qcomparator'],
-            $indexes['filters']
+        return $this->respondWithIndex(
+            $request,
+            $this->roleService,
+            RoleResource::class,
+            ['permissions'],
         );
-
-        if ($results instanceof LengthAwarePaginator) {
-            /** @var Collection $collection */
-            $collection = $results->getCollection();
-            $collection->load('permissions');
-        } else {
-            /** @var Collection $results */
-            $results->load('permissions');
-        }
-
-        $formattedResponse = $this->paginateResponse($results, RoleResource::class);
-
-        return $this->setStatusMsg($formattedResponse['meta']['total'] ? 'success' : 'failed')
-            ->respondOK($formattedResponse, $formattedResponse['meta']['total'] ? __('messages.data_found') : __('messages.data_not_found'));
     }
 
     public function store(StoreUpdateRequest $request): JsonResponse

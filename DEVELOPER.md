@@ -141,7 +141,7 @@ Only keys listed in `config/settings.php` are accepted. An unknown key returns `
 
 Allowed keys: `send_welcome_email`, `smtp_host`, `smtp_port`, `smtp_username`, `smtp_password`, `smtp_encryption`, `mail_from_address`, `mail_from_name`.
 
-`smtp_password` is stored for the mailer and omitted from `GET /settings`. That item includes `"secret": true` and no `value`.
+`smtp_password` is stored for the mailer and omitted from `GET /settings`. That item includes `"secret": true` and no `value`. PostgreSQL history triggers also redact its value from both snapshots and changes, including existing history rows migrated by the application.
 ```http
 PATCH /settings
 Authorization: Bearer <token>
@@ -459,7 +459,38 @@ php artisan test --filter=McpTest
 
 ---
 
-## 9. Quality Assurance & CI Checks
+## 9. Operations
+
+Every HTTP response includes `X-Request-ID`. A valid client-supplied ID is preserved; otherwise the application generates a UUID. The same ID, request method, path, and authenticated user ID are attached to structured application logs.
+
+Firebase delivery is asynchronous on the `notifications` queue. Run a worker for both queues:
+
+```bash
+php artisan queue:work --queue=default,notifications
+```
+
+The scheduler checks queue depth every minute and backup freshness hourly. Keep `php artisan schedule:work` running locally or invoke `php artisan schedule:run` every minute in production.
+
+```dotenv
+QUEUE_MONITOR_CONNECTION=database
+QUEUE_MONITOR_QUEUES=default,notifications
+QUEUE_MONITOR_MAX_JOBS=100
+# DB_BACKUP_PATH=/absolute/path/to/latest.dump
+DB_BACKUP_MAX_AGE_HOURS=24
+```
+
+`DB_BACKUP_PATH` defaults to `storage/app/backups/latest.dump`. The check verifies that the file exists, is readable and nonempty, and is recent. It does not create a backup or prove it can be restored; schedule PostgreSQL backups separately and test restores routinely.
+
+```bash
+php artisan health:database-backup
+php artisan schedule:list
+```
+
+The project requires PHP 8.4 or newer within the 8.x release line.
+
+---
+
+## 10. Quality Assurance & CI Checks
 
 To ensure the backend API remains stable, performant, and clean, all developers (and AI agents) must run the following sequence of checks before finalizing any feature or prompt:
 

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\BaseApiController;
+use App\Http\Middleware\AssignRequestId;
 use App\Http\Middleware\LocalizationMiddleware;
 use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Auth\AuthenticationException;
@@ -21,9 +22,27 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->append(LocalizationMiddleware::class);
+        $middleware->append([
+            AssignRequestId::class,
+            LocalizationMiddleware::class,
+        ]);
     })
-    ->withExceptions(function (Exceptions $exceptions) {
+    ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->context(function (): array {
+            if (! app()->bound('request')) {
+                return [];
+            }
+
+            $request = request();
+
+            return array_filter([
+                'request_id' => $request->attributes->get('request_id'),
+                'user_id' => $request->user()?->getAuthIdentifier(),
+                'method' => $request->method(),
+                'path' => $request->path(),
+            ], fn (mixed $value): bool => $value !== null);
+        });
+
         $exceptions->render(function (AuthenticationException $e, Request $request) {
             if ($request->wantsJson()) {
                 return (new BaseApiController)->respondUnauthorized(null, $e->getMessage());
@@ -51,6 +70,11 @@ return Application::configure(basePath: dirname(__DIR__))
         })->render(function (Throwable $e, Request $request) {
             if ($request->wantsJson()) {
                 $status = method_exists($e, 'getStatusCode') ? $e->getStatusCode() : 500;
+                if ($status >= 500) {
+                    return (new BaseApiController)->respondInternalError([
+                        'request_id' => $request->attributes->get('request_id'),
+                    ]);
+                }
 
                 return (new BaseApiController)->setStatusCode($status)->setStatusMsg('failed')->respondDetail($e->getMessage(), false);
             }

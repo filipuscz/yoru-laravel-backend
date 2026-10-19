@@ -8,6 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
@@ -50,6 +51,24 @@ class UserControllerTest extends TestCase
             ->assertJsonStructure(['data', 'meta']);
     }
 
+    public function test_can_list_users_with_cursor_pagination_and_eager_loaded_relations(): void
+    {
+        User::factory()->count(3)->create();
+
+        $response = $this->actingAs($this->adminUser, 'api')
+            ->withHeaders(['X-API-TOKEN' => $this->apiToken])
+            ->getJson('/api/v1/users?use_cursor=true&limit=2');
+
+        $response->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonStructure([
+                'data' => [
+                    '*' => ['roles', 'detail'],
+                ],
+                'meta' => ['per_page', 'has_more_pages', 'next_cursor'],
+            ]);
+    }
+
     public function test_can_create_user()
     {
         $payload = [
@@ -70,6 +89,66 @@ class UserControllerTest extends TestCase
             'email' => 'testuser@example.com',
             'username' => 'testuser',
         ]);
+    }
+
+    public function test_non_admin_cannot_grant_admin_role(): void
+    {
+        Role::create(['name' => 'admin', 'guard_name' => 'api']);
+
+        $response = $this->actingAs($this->adminUser, 'api')
+            ->withHeaders(['X-API-TOKEN' => $this->apiToken])
+            ->postJson('/api/v1/users', [
+                'name' => 'Unauthorized Admin',
+                'email' => 'unauthorized-admin@example.com',
+                'username' => 'unauthorized-admin',
+                'password' => 'secret123',
+                'roles' => ['admin'],
+            ]);
+
+        $response->assertForbidden();
+        $this->assertDatabaseMissing('me_users', [
+            'email' => 'unauthorized-admin@example.com',
+        ]);
+    }
+
+    public function test_non_admin_cannot_remove_admin_role(): void
+    {
+        $adminRole = Role::create(['name' => 'admin', 'guard_name' => 'api']);
+        Role::create(['name' => 'user', 'guard_name' => 'api']);
+        $target = User::factory()->create();
+        $target->assignRole($adminRole);
+
+        $response = $this->actingAs($this->adminUser, 'api')
+            ->withHeaders(['X-API-TOKEN' => $this->apiToken])
+            ->putJson("/api/v1/users/{$target->getKey()}", [
+                'name' => $target->name,
+                'email' => $target->email,
+                'username' => $target->username,
+                'roles' => ['user'],
+            ]);
+
+        $response->assertForbidden();
+        $this->assertTrue($target->fresh()->hasRole('admin', 'api'));
+    }
+
+    public function test_admin_can_grant_admin_role(): void
+    {
+        $adminRole = Role::create(['name' => 'admin', 'guard_name' => 'api']);
+        $this->adminUser->assignRole($adminRole);
+
+        $response = $this->actingAs($this->adminUser, 'api')
+            ->withHeaders(['X-API-TOKEN' => $this->apiToken])
+            ->postJson('/api/v1/users', [
+                'name' => 'Authorized Admin',
+                'email' => 'authorized-admin@example.com',
+                'username' => 'authorized-admin',
+                'password' => 'secret123',
+                'roles' => ['admin'],
+            ]);
+
+        $response->assertOk();
+        $created = User::query()->where('email', 'authorized-admin@example.com')->firstOrFail();
+        $this->assertTrue($created->hasRole('admin', 'api'));
     }
 
     public function test_transaction_pin_is_stored_as_a_hash_and_omitted_from_the_response(): void

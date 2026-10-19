@@ -20,4 +20,11 @@ class ApiHardeningTest extends TestCase
     {
         $this->assertFalse(Passport::$passwordGrantEnabled);
     }
+
+    public function test_malformed_api_token_returns_unauthorized(): void
+    {
+        $this->withHeader('X-API-TOKEN', 'not-base64!')
+            ->getJson('/api/v1/examples')
+            ->assertUnauthorized();
+    }
 }

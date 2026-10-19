@@ -11,6 +11,10 @@ This document serves as the master guidelines file for AI Agents operating in th
 - Keep controllers thin. Existing API controllers extend `App\Http\Controllers\BaseApiController` and delegate business logic to services.
 - Put reusable data operations in services. Existing services extend `App\Services\BaseService`.
 - Use API resources for response data where the existing endpoint pattern does so.
+- Resource list controllers use `BaseApiController::respondWithIndex()`. Pass eager-loaded relation names to it instead of loading relations after pagination; this works for offset, cursor, and unpaginated results.
+- Every service used for list search defines its text-only `$searchableColumns`. Do not restore the fallback that casts every table column to text. Explicit filters may still target valid table columns.
+- Firebase delivery belongs in `FirebaseNotificationService` and the queued `SendFirebaseNotification` job. Do not put provider-specific notification code back in `BaseService`.
+- Role and permission list caches use atomic integer versions through `UsesVersionedCache`; never use `time()` as a cache version.
 
 ## 2. Database & Eloquent Conventions (CRITICAL)
 
@@ -35,12 +39,14 @@ PostgreSQL writes row history. Do not record it in PHP with model events, observ
 - Each audited table has its own history table, trigger function (`RETURNS trigger`), and `AFTER INSERT OR UPDATE OR DELETE` trigger. A trigger attaches to one table.
 - Names follow the source table. `tb_examples` uses history table `tb_example_hist`, record column `example_id`, function `fn_tb_example_hist`, and trigger `trg_tb_examples_hist`. Keep the source prefix (`me_`, `tb_`, `st_`, `mg_`).
 - History columns are `id`, the record id (`unsignedBigInteger`, indexed, no foreign key), `action` (`created`, `updated`, or `deleted`), `snapshot` (`jsonb`), `changes` (`jsonb`, nullable), and timestamps. The missing foreign key lets a hard delete insert its history row.
+- Index `created_at` on every history table so retention purges do not scan the whole table.
 - `INSERT` stores `created` and `to_jsonb(NEW)`. An `UPDATE` that sets `deleted_at` from null stores `deleted`. Any other `UPDATE` stores `updated` and `changes` for keys whose values differ. `DELETE` stores `deleted` and `to_jsonb(OLD)`.
 - `to_jsonb(NEW)` includes columns added later. Leave the trigger unchanged when a column is added. Older history rows omit that key. A missing key means the column did not exist yet. A JSON `null` means the column existed and the value was null.
-- Remove `password`, `remember_token`, and `transaction_pin` from `snapshot` and `changes`.
+- Remove `password`, `remember_token`, and `transaction_pin` from `snapshot` and `changes`. For `st_settings`, also remove `value` whenever the setting key is `smtp_password`; secrets must never reach history storage.
 - History rows do not store the acting Laravel user. PostgreSQL cannot see `Auth::id()`.
 - Audited tables: `tb_examples`, `me_users`, `me_user_details`, `st_settings`, `st_roles`, `st_permissions`. Leave cache, jobs, sessions, OAuth tokens, password-reset tokens, and notifications unaudited.
 - Put trigger SQL in a migration with `DB::unprepared`. A migration file is in the global namespace; a `use RuntimeException` statement there is a no-op and becomes an error.
+- History definitions live in `config/history.php`; `App\Support\HistoryTriggerSql` is the only trigger SQL generator. Use it from migrations instead of copying PL/pgSQL.
 - There is no history Eloquent model. Tests assert rows through the query builder. Reads go through `App\Services\HistoryService`.
 - The read API is `HistoryController`. Sources live in `config/history.php`. List `GET /api/v1/{resource}/{id}/histories` returns `id`, `action`, `changes`, and `created_at`. Show `GET /api/v1/{resource}/{id}/histories/{history}` adds `snapshot`. `page` and `limit` apply (`limit` max 100).
 - Routes: `examples/{example}`, `users/{user}`, `users/{user}/details` (the detail row for that user), `settings/{setting}` (id or key), `roles/{role}`, and `permissions/{permission}`.
@@ -61,6 +67,15 @@ PostgreSQL writes row history. Do not record it in PHP with model events, observ
 - Use Laravel's built-in authentication and authorization features (gates, policies, Sanctum/Passport, etc.).
 - Use queued jobs for time-consuming operations with the `ShouldQueue` interface.
 - **Settings allowlist**: `PATCH /settings` accepts only keys in `config/settings.php`. Reject the whole request when any key is unknown, and write nothing. Secret keys (`smtp_password`) stay stored for the mailer and are omitted from `SettingResource`. Add a new key to that config, not only to `RoleSeeder`.
+- **Admin roles**: granting or removing the `admin` role must pass `UserPolicy::assignRoles`; ordinary user-management permission is not sufficient.
+- **API tokens**: malformed, tampered, expired, or undecryptable API tokens are authentication failures and must return `false` / HTTP 401, never an unhandled parsing exception.
+
+### Operations
+
+- PHP 8.4 is the minimum supported runtime.
+- `AssignRequestId` accepts or generates `X-Request-ID`, shares structured log context, and returns the ID in the response header. Preserve this context in operational logs.
+- Queue notifications run on the `notifications` queue. Laravel schedules `queue:monitor` every minute and logs `QueueBusy` and `JobFailed` events with structured context.
+- `health:database-backup` checks that the configured PostgreSQL backup file exists, is nonempty and readable, and is no older than the configured threshold. It verifies backup freshness, not restore validity; production operations must also test restores.
 
 ## 4. Code Style & PHP Rules
 
@@ -92,6 +107,8 @@ PostgreSQL writes row history. Do not record it in PHP with model events, observ
 - Build frontend assets when needed: `npm run build`
 - Pass `--no-interaction` to all Artisan commands to ensure they work without user input.
 - Purge history: `php artisan history:purge --days=365 --batch=1000`
+- Check backup freshness: `php artisan health:database-backup`
+- Inspect scheduled queue and backup checks: `php artisan schedule:list`
 
 ## 7. Laravel Boost & Ecosystem
 
